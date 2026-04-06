@@ -1,0 +1,3 @@
+- [ ] This project is a starter repository for the FlightLogger app.
+- [ ] Keep this file updated as the project structure evolves.
+- [ ] Use `npm install`, `npm run dev`, and `npm run build` for local development.

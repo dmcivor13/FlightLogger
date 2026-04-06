@@ -1,0 +1,4 @@
+Depart Date,Depart Time,Arrive Time,Airline,Flight Number,Depart Airport,Arrive Airport,Seat,Cabin Class
+2026-01-15,08:30,10:15,United,UA123,SFO,LAX,14A,Economy
+2026-02-20,14:00,17:30,Delta,DL456,LAX,JFK,22B,Economy
+2026-03-10,07:45,09:00,Southwest,WN789,SFO,LAS,12C,Economy
