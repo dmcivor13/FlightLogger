@@ -11,17 +11,17 @@ vi.mock('../api/client');
 const mockPreview: ImportPreviewResponse = {
   passenger: 'Alice',
   toCreate: [
-    { date: '2026-01-15', origin: 'SFO', destination: 'LAX', airline: 'United', flight_number: 'UA123', passengers: ['Alice'] },
-    { date: '2026-02-20', origin: 'LAX', destination: 'JFK', airline: 'Delta', flight_number: 'DL456', passengers: ['Alice'] },
+    { flight_date: '2026-01-15', origin_iata: 'SFO', destination_iata: 'LAX', airline_name: 'United', flight_number: 'UA123', passengers: ['Alice'] },
+    { flight_date: '2026-02-20', origin_iata: 'LAX', destination_iata: 'JFK', airline_name: 'Delta', flight_number: 'DL456', passengers: ['Alice'] },
   ],
   toMerge: [
     {
       existingId: 5,
       existingFlight: {
-        id: 5, date: '2026-03-10', origin: 'SFO', destination: 'LAS', airline: 'Southwest',
+        id: 5, flight_date: '2026-03-10', origin_iata: 'SFO', destination_iata: 'LAS', airline_name: 'Southwest',
         flight_number: 'WN789', passengers: ['Bob'], created_at: '', updated_at: '',
       },
-      incomingFlight: { date: '2026-03-10', origin: 'SFO', destination: 'LAS', airline: 'Southwest', flight_number: 'WN789', passengers: ['Alice'] },
+      incomingFlight: { flight_date: '2026-03-10', origin_iata: 'SFO', destination_iata: 'LAS', airline_name: 'Southwest', flight_number: 'WN789', passengers: ['Alice'] },
     },
   ],
   skipped: [],
@@ -39,7 +39,7 @@ function renderImportPage() {
 describe('ImportPage — Step 1 (Upload)', () => {
   beforeEach(() => {
     vi.mocked(client.importPreview).mockResolvedValue(mockPreview);
-    vi.mocked(client.importCommit).mockResolvedValue({ created: 2, merged: 1, skipped: 0 });
+    vi.mocked(client.importCommit).mockResolvedValue({ rows_processed: 3, flights_created: 2, flights_matched: 1, passengers_added: 0, rows_skipped: 0, warnings: [] });
   });
 
   it('shows validation error when no file is selected', async () => {
@@ -69,7 +69,7 @@ describe('ImportPage — Step 1 (Upload)', () => {
 describe('ImportPage — Step 2 (Preview)', () => {
   beforeEach(() => {
     vi.mocked(client.importPreview).mockResolvedValue(mockPreview);
-    vi.mocked(client.importCommit).mockResolvedValue({ created: 2, merged: 1, skipped: 0 });
+    vi.mocked(client.importCommit).mockResolvedValue({ rows_processed: 3, flights_created: 2, flights_matched: 1, passengers_added: 0, rows_skipped: 0, warnings: [] });
   });
 
   async function goToStep2() {
@@ -96,7 +96,7 @@ describe('ImportPage — Step 2 (Preview)', () => {
   it('skipped section is collapsed by default', async () => {
     const previewWithSkipped: ImportPreviewResponse = {
       ...mockPreview,
-      skipped: [{ date: '2026-04-01', origin: 'SFO', destination: 'LAX', airline: 'United', flight_number: 'UA999', passengers: ['Alice'] }],
+      skipped: [{ flight_date: '2026-04-01', origin_iata: 'SFO', destination_iata: 'LAX', airline_name: 'United', flight_number: 'UA999', passengers: ['Alice'] }],
     };
     vi.mocked(client.importPreview).mockResolvedValue(previewWithSkipped);
 
@@ -118,7 +118,7 @@ describe('ImportPage — Step 2 (Preview)', () => {
 describe('ImportPage — Step 3 (Result)', () => {
   it('shows created/merged/skipped counts after commit', async () => {
     vi.mocked(client.importPreview).mockResolvedValue(mockPreview);
-    vi.mocked(client.importCommit).mockResolvedValue({ created: 2, merged: 1, skipped: 0 });
+    vi.mocked(client.importCommit).mockResolvedValue({ rows_processed: 3, flights_created: 2, flights_matched: 1, passengers_added: 0, rows_skipped: 0, warnings: [] });
 
     const user = userEvent.setup();
     renderImportPage();
@@ -131,7 +131,7 @@ describe('ImportPage — Step 3 (Result)', () => {
 
     await waitFor(() => {
       expect(screen.getByText(/2 flights? created/i)).toBeInTheDocument();
-      expect(screen.getByText(/1 .*merged/i)).toBeInTheDocument();
+      expect(screen.getByText(/1 matched/i)).toBeInTheDocument();
     });
   });
 });

@@ -4,10 +4,10 @@ import userEvent from '@testing-library/user-event';
 import { FlightForm } from '../components/flights/FlightForm';
 
 const baseValues = {
-  date: '2026-04-06',
-  origin: 'SFO',
-  destination: 'LAX',
-  airline: 'United',
+  flight_date: '2026-04-06',
+  origin_iata: 'SFO',
+  destination_iata: 'LAX',
+  airline_name: 'United',
   flight_number: 'UA123',
   passengers: [] as string[],
 };
@@ -22,10 +22,10 @@ describe('FlightForm', () => {
 
     await waitFor(() => expect(onSubmit).toHaveBeenCalledOnce());
     const [payload] = onSubmit.mock.calls[0];
-    expect(payload.date).toBe('2026-04-06');
-    expect(payload.origin).toBe('SFO');
-    expect(payload.destination).toBe('LAX');
-    expect(payload.airline).toBe('United');
+    expect(payload.flight_date).toBe('2026-04-06');
+    expect(payload.origin_iata).toBe('SFO');
+    expect(payload.destination_iata).toBe('LAX');
+    expect(payload.airline_name).toBe('United');
     expect(payload.flight_number).toBe('UA123');
     expect(Array.isArray(payload.passengers)).toBe(true);
   });
@@ -63,7 +63,7 @@ describe('FlightForm', () => {
     );
 
     expect(screen.getByText('Alice')).toBeInTheDocument();
-    await userEvent.click(screen.getByRole('button', { name: /remove alice/i }));
+    await user.click(screen.getByRole('button', { name: /remove alice/i }));
     expect(screen.queryByText('Alice')).not.toBeInTheDocument();
   });
 
