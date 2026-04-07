@@ -18,7 +18,7 @@ export function MapPage() {
       .then((flights) => {
         const counts = new Map<string, number>();
         for (const f of flights) {
-          const key = `${f.origin}|${f.destination}`;
+          const key = `${f.origin_iata}|${f.destination_iata}`;
           counts.set(key, (counts.get(key) ?? 0) + 1);
         }
         const r: Route[] = [];
