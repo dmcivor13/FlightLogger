@@ -3,7 +3,7 @@ import multer from 'multer';
 import Papa from 'papaparse';
 import { v4 as uuidv4 } from 'uuid';
 import type { Db } from '../db';
-import type { FlightPayload, FlightRecord, ImportPreviewResponse, ImportCommitResponse, ClassOfService, FlightReason } from '../types';
+import type { FlightPayload, FlightRecord, PassengerDetail, ImportPreviewResponse, ImportCommitResponse, ClassOfService, FlightReason } from '../types';
 import { normalizeFlightNumber } from '../services/flight-lookup/FlightLookupService.js';
 
 // ─── FR24 CSV column names (after trim+lowercase) ────────────────────────────
@@ -65,8 +65,22 @@ export function normaliseHeaders(raw: string[]): string[] {
   return raw.map((h) => h.trim().toLowerCase());
 }
 
-// Map a single FR24 CSV row to a FlightPayload (without passengers)
-export function mapFr24Row(row: Record<string, string>): Partial<FlightPayload> | null {
+// The per-passenger attributes extracted from an FR24 row
+export interface Fr24PassengerFields {
+  seat?: string;
+  class?: ClassOfService;
+  reason?: FlightReason;
+  notes?: string;
+}
+
+// Return type for mapFr24Row: flight-level fields + per-passenger fields (without name, known later)
+export interface Fr24MappedRow {
+  flight: Partial<Omit<FlightPayload, 'passengers'>>;
+  passengerFields: Fr24PassengerFields;
+}
+
+// Map a single FR24 CSV row to flight + per-passenger fields
+export function mapFr24Row(row: Record<string, string>): Fr24MappedRow | null {
   const date = row['date']?.trim();
   const rawFrom = row['from']?.trim();
   const rawTo = row['to']?.trim();
@@ -82,7 +96,7 @@ export function mapFr24Row(row: Record<string, string>): Partial<FlightPayload> 
   const rawDepTime = row['dep time']?.trim();
   const rawArrTime = row['arr time']?.trim();
 
-  const payload: Partial<FlightPayload> = {
+  const flight: Partial<Omit<FlightPayload, 'passengers'>> = {
     flight_date: date,
     origin_iata: parseIata(rawFrom),
     destination_iata: parseIata(rawTo),
@@ -93,15 +107,18 @@ export function mapFr24Row(row: Record<string, string>): Partial<FlightPayload> 
     scheduled_arrival: parseTime(rawArrTime ?? ''),
     aircraft_type: rawAircraft ? parseAircraftType(rawAircraft) : undefined,
     aircraft_registration: row['registration']?.trim() || undefined,
-    seat: row['seat number']?.trim() || undefined,
-    class: rawClass ? CLASS_MAP[rawClass] : undefined,
-    reason: rawReason ? REASON_MAP[rawReason] : undefined,
     duration_minutes: rawDuration ? parseDurationMinutes(rawDuration) : undefined,
-    notes: row['note']?.trim() || undefined,
     data_source: 'flightradar24_csv',
   };
 
-  return payload;
+  const passengerFields: Fr24PassengerFields = {
+    seat: row['seat number']?.trim() || undefined,
+    class: rawClass ? CLASS_MAP[rawClass] : undefined,
+    reason: rawReason ? REASON_MAP[rawReason] : undefined,
+    notes: row['note']?.trim() || undefined,
+  };
+
+  return { flight, passengerFields };
 }
 
 // ─── In-memory token store ────────────────────────────────────────────────────
@@ -126,8 +143,10 @@ function purgeExpired() {
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
-function getPassengers(db: Db, flightId: number): string[] {
-  return (db.prepare('SELECT name FROM flight_passengers WHERE flight_id = ?').all(flightId) as { name: string }[]).map((r) => r.name);
+function getPassengers(db: Db, flightId: number): PassengerDetail[] {
+  return db.prepare(
+    'SELECT name, seat, class, reason, notes FROM flight_passengers WHERE flight_id = ? ORDER BY id'
+  ).all(flightId) as PassengerDetail[];
 }
 
 function rowToRecord(db: Db, row: Record<string, unknown>): FlightRecord {
@@ -140,7 +159,6 @@ function rowToRecord(db: Db, row: Record<string, unknown>): FlightRecord {
 function findExistingFlight(db: Db, flightDate: string, flightNumber: string | undefined): FlightRecord | undefined {
   if (!flightNumber) return undefined;
   const normalized = normalizeFlightNumber(flightNumber);
-  // Check both the raw number and normalized form
   const rows = db.prepare(
     'SELECT * FROM flights WHERE flight_date = ? AND flight_number IS NOT NULL'
   ).all(flightDate) as Record<string, unknown>[];
@@ -190,18 +208,19 @@ export function createImportRouter(db: Db) {
 
     for (const row of parsed.data) {
       const mapped = mapFr24Row(row);
-      if (!mapped || !mapped.origin_iata || !mapped.destination_iata || !mapped.airline_name) continue;
+      if (!mapped || !mapped.flight.origin_iata || !mapped.flight.destination_iata || !mapped.flight.airline_name) continue;
 
+      const passengerDetail: PassengerDetail = { name: passenger, ...mapped.passengerFields };
       const payload: FlightPayload = {
-        ...(mapped as FlightPayload),
-        passengers: [passenger],
+        ...(mapped.flight as FlightPayload),
+        passengers: [passengerDetail],
       };
 
       const match = findExistingFlight(db, payload.flight_date, payload.flight_number);
 
       if (!match) {
         toCreate.push(payload);
-      } else if (match.passengers.includes(passenger)) {
+      } else if (match.passengers.some((p) => p.name === passenger)) {
         skipped.push(payload);
       } else {
         toMerge.push({ existingId: match.id, existingFlight: match, incomingFlight: payload });
@@ -243,19 +262,20 @@ export function createImportRouter(db: Db) {
               origin_iata, destination_iata,
               scheduled_departure, scheduled_arrival,
               aircraft_type, aircraft_registration,
-              seat, class, reason, duration_minutes, data_source, notes
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+              duration_minutes, data_source
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
           `).run(
             payload.flight_date, payload.airline_iata ?? null, payload.airline_name,
             payload.flight_number ?? null,
             payload.origin_iata, payload.destination_iata,
             payload.scheduled_departure ?? null, payload.scheduled_arrival ?? null,
             payload.aircraft_type ?? null, payload.aircraft_registration ?? null,
-            payload.seat ?? null, payload.class ?? null, payload.reason ?? null,
             payload.duration_minutes ?? null, payload.data_source ?? null,
-            payload.notes ?? null,
           );
-          db.prepare('INSERT OR IGNORE INTO flight_passengers (flight_id, name) VALUES (?, ?)').run(result.lastInsertRowid, passenger);
+          const p = payload.passengers[0];
+          db.prepare(
+            'INSERT OR IGNORE INTO flight_passengers (flight_id, name, seat, class, reason, notes) VALUES (?, ?, ?, ?, ?, ?)'
+          ).run(result.lastInsertRowid, passenger, p?.seat ?? null, p?.class ?? null, p?.reason ?? null, p?.notes ?? null);
           flightsCreated++;
           passengersAdded++;
         } catch (e) {
@@ -264,18 +284,14 @@ export function createImportRouter(db: Db) {
       }
 
       for (const { existingId, incomingFlight } of toMerge) {
-        // Update any missing fields on the existing flight
+        // Update any missing flight-level fields on the existing flight
         db.prepare(`
           UPDATE flights SET
             aircraft_type = COALESCE(aircraft_type, ?),
             aircraft_registration = COALESCE(aircraft_registration, ?),
             scheduled_departure = COALESCE(scheduled_departure, ?),
             scheduled_arrival = COALESCE(scheduled_arrival, ?),
-            seat = COALESCE(seat, ?),
-            class = COALESCE(class, ?),
-            reason = COALESCE(reason, ?),
             duration_minutes = COALESCE(duration_minutes, ?),
-            notes = COALESCE(notes, ?),
             updated_at = datetime('now')
           WHERE id = ?
         `).run(
@@ -283,15 +299,14 @@ export function createImportRouter(db: Db) {
           incomingFlight.aircraft_registration ?? null,
           incomingFlight.scheduled_departure ?? null,
           incomingFlight.scheduled_arrival ?? null,
-          incomingFlight.seat ?? null,
-          incomingFlight.class ?? null,
-          incomingFlight.reason ?? null,
           incomingFlight.duration_minutes ?? null,
-          incomingFlight.notes ?? null,
           existingId,
         );
 
-        const added = db.prepare('INSERT OR IGNORE INTO flight_passengers (flight_id, name) VALUES (?, ?)').run(existingId, passenger);
+        const p = incomingFlight.passengers[0];
+        const added = db.prepare(
+          'INSERT OR IGNORE INTO flight_passengers (flight_id, name, seat, class, reason, notes) VALUES (?, ?, ?, ?, ?, ?)'
+        ).run(existingId, passenger, p?.seat ?? null, p?.class ?? null, p?.reason ?? null, p?.notes ?? null);
         flightsMatched++;
         if (added.changes > 0) passengersAdded++;
       }

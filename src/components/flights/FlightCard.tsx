@@ -42,30 +42,38 @@ export function FlightCard({ flight }: { flight: FlightRecord }) {
           )}
         </div>
       </div>
-      <div className="mt-3 flex flex-wrap gap-2 items-center">
-        {flight.class && (
-          <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${CLASS_COLOURS[flight.class] ?? 'bg-slate-100 text-slate-700'}`}>
-            {flight.class}
-          </span>
-        )}
-        {flight.reason && (
-          <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${REASON_COLOURS[flight.reason] ?? 'bg-slate-100 text-slate-700'}`}>
-            {flight.reason}
-          </span>
-        )}
-        {flight.seat && (
-          <span className="text-xs bg-slate-100 text-slate-700 px-2 py-0.5 rounded-full">
-            Seat {flight.seat}
-          </span>
-        )}
-        {flight.passengers.map((p) => (
-          <span key={p} className="text-xs bg-blue-50 text-blue-700 px-2 py-0.5 rounded-full">
-            {p}
-          </span>
-        ))}
-      </div>
-      {flight.notes && (
-        <p className="text-sm text-slate-500 mt-2 line-clamp-1">{flight.notes}</p>
+
+      {flight.passengers.length > 0 && (
+        <div className="mt-3 space-y-1">
+          {flight.passengers.map((p) => (
+            <div key={p.name} className="flex flex-wrap items-center gap-1.5">
+              <span className="text-xs bg-blue-50 text-blue-700 px-2 py-0.5 rounded-full font-medium">
+                {p.name}
+              </span>
+              {p.seat && (
+                <span className="text-xs bg-slate-100 text-slate-600 px-2 py-0.5 rounded-full">
+                  Seat {p.seat}
+                </span>
+              )}
+              {p.class && (
+                <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${CLASS_COLOURS[p.class] ?? 'bg-slate-100 text-slate-700'}`}>
+                  {p.class}
+                </span>
+              )}
+              {p.reason && (
+                <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${REASON_COLOURS[p.reason] ?? 'bg-slate-100 text-slate-700'}`}>
+                  {p.reason}
+                </span>
+              )}
+            </div>
+          ))}
+        </div>
+      )}
+
+      {flight.passengers.some((p) => p.notes) && (
+        <p className="text-sm text-slate-500 mt-2 line-clamp-1">
+          {flight.passengers.find((p) => p.notes)?.notes}
+        </p>
       )}
     </Link>
   );

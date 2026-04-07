@@ -6,13 +6,14 @@ interface Props {
 }
 
 function FlightRow({ flight }: { flight: FlightPayload }) {
+  const p = flight.passengers[0];
   return (
     <tr className="text-sm">
       <td className="px-3 py-2 font-medium">{flight.origin_iata} → {flight.destination_iata}</td>
       <td className="px-3 py-2 text-slate-600">{flight.flight_date}</td>
       <td className="px-3 py-2 text-slate-600">{flight.airline_name}{flight.flight_number ? ` · ${flight.flight_number}` : ''}</td>
-      <td className="px-3 py-2 text-slate-500">{flight.seat ?? '—'}</td>
-      <td className="px-3 py-2 text-slate-500">{flight.class ?? '—'}</td>
+      <td className="px-3 py-2 text-slate-500">{p?.seat ?? '—'}</td>
+      <td className="px-3 py-2 text-slate-500">{p?.class ?? '—'}</td>
     </tr>
   );
 }
@@ -24,7 +25,7 @@ function MergeRow({ existingFlight }: { existingFlight: FlightRecord }) {
       <td className="px-3 py-2 text-slate-600">{existingFlight.flight_date}</td>
       <td className="px-3 py-2 text-slate-600">{existingFlight.airline_name}{existingFlight.flight_number ? ` · ${existingFlight.flight_number}` : ''}</td>
       <td className="px-3 py-2 text-slate-500" colSpan={2}>
-        <span className="text-xs text-amber-700">Currently: {existingFlight.passengers.join(', ')}</span>
+        <span className="text-xs text-amber-700">Currently: {existingFlight.passengers.map((p) => p.name).join(', ')}</span>
       </td>
     </tr>
   );

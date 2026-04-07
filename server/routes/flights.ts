@@ -1,9 +1,11 @@
 import { Router } from 'express';
 import type { Db } from '../db';
-import type { FlightPayload, FlightRecord } from '../types';
+import type { FlightPayload, FlightRecord, PassengerDetail } from '../types';
 
-function getPassengers(db: Db, flightId: number): string[] {
-  return (db.prepare('SELECT name FROM flight_passengers WHERE flight_id = ? ORDER BY id').all(flightId) as { name: string }[]).map((r) => r.name);
+function getPassengers(db: Db, flightId: number): PassengerDetail[] {
+  return db.prepare(
+    'SELECT name, seat, class, reason, notes FROM flight_passengers WHERE flight_id = ? ORDER BY id'
+  ).all(flightId) as PassengerDetail[];
 }
 
 function rowToRecord(db: Db, row: Record<string, unknown>): FlightRecord {
@@ -22,26 +24,23 @@ export function createFlightsRouter(db: Db) {
       dateFrom, dateTo, origin, destination, airline, aircraft, class: cls, reason, passenger, q,
     } = req.query as Record<string, string>;
 
-    let sql = 'SELECT DISTINCT f.* FROM flights f';
+    // Always join flight_passengers so we can filter on per-passenger fields
+    let sql = 'SELECT DISTINCT f.* FROM flights f LEFT JOIN flight_passengers fp ON fp.flight_id = f.id';
     const params: unknown[] = [];
-
-    if (passenger) {
-      sql += ' INNER JOIN flight_passengers fp ON fp.flight_id = f.id AND fp.name = ?';
-      params.push(passenger);
-    }
 
     const conditions: string[] = [];
 
-    if (dateFrom)    { conditions.push('f.flight_date >= ?');       params.push(dateFrom); }
-    if (dateTo)      { conditions.push('f.flight_date <= ?');       params.push(dateTo); }
-    if (origin)      { conditions.push('f.origin_iata = ?');        params.push(origin.toUpperCase()); }
-    if (destination) { conditions.push('f.destination_iata = ?');   params.push(destination.toUpperCase()); }
-    if (airline)     { conditions.push('f.airline_name LIKE ?');    params.push(`%${airline}%`); }
-    if (aircraft)    { conditions.push('f.aircraft_type LIKE ?');   params.push(`%${aircraft}%`); }
-    if (cls)         { conditions.push('f.class = ?');              params.push(cls); }
-    if (reason)      { conditions.push('f.reason = ?');             params.push(reason); }
+    if (passenger)    { conditions.push('fp.name = ?');                params.push(passenger); }
+    if (dateFrom)     { conditions.push('f.flight_date >= ?');         params.push(dateFrom); }
+    if (dateTo)       { conditions.push('f.flight_date <= ?');         params.push(dateTo); }
+    if (origin)       { conditions.push('f.origin_iata = ?');          params.push(origin.toUpperCase()); }
+    if (destination)  { conditions.push('f.destination_iata = ?');     params.push(destination.toUpperCase()); }
+    if (airline)      { conditions.push('f.airline_name LIKE ?');      params.push(`%${airline}%`); }
+    if (aircraft)     { conditions.push('f.aircraft_type LIKE ?');     params.push(`%${aircraft}%`); }
+    if (cls)          { conditions.push('fp.class = ?');               params.push(cls); }
+    if (reason)       { conditions.push('fp.reason = ?');              params.push(reason); }
     if (q) {
-      conditions.push('(f.airline_name LIKE ? OR f.flight_number LIKE ? OR f.aircraft_type LIKE ? OR f.origin_iata LIKE ? OR f.destination_iata LIKE ? OR f.notes LIKE ?)');
+      conditions.push('(f.airline_name LIKE ? OR f.flight_number LIKE ? OR f.aircraft_type LIKE ? OR f.origin_iata LIKE ? OR f.destination_iata LIKE ? OR fp.notes LIKE ?)');
       const like = `%${q}%`;
       params.push(like, like, like, like, like, like);
     }
@@ -75,8 +74,8 @@ export function createFlightsRouter(db: Db) {
           scheduled_departure, actual_departure,
           scheduled_arrival, actual_arrival,
           aircraft_type, aircraft_registration,
-          seat, class, reason, duration_minutes, data_source, notes
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+          duration_minutes, data_source
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
       `).run(
         payload.flight_date, payload.airline_iata ?? null, payload.airline_name,
         payload.flight_number ?? null,
@@ -84,13 +83,13 @@ export function createFlightsRouter(db: Db) {
         payload.scheduled_departure ?? null, payload.actual_departure ?? null,
         payload.scheduled_arrival ?? null, payload.actual_arrival ?? null,
         payload.aircraft_type ?? null, payload.aircraft_registration ?? null,
-        payload.seat ?? null, payload.class ?? null, payload.reason ?? null,
         payload.duration_minutes ?? null, payload.data_source ?? null,
-        payload.notes ?? null,
       );
       const id = result.lastInsertRowid as number;
-      for (const name of (payload.passengers ?? [])) {
-        db.prepare('INSERT OR IGNORE INTO flight_passengers (flight_id, name) VALUES (?, ?)').run(id, name);
+      for (const p of (payload.passengers ?? [])) {
+        db.prepare(
+          'INSERT OR IGNORE INTO flight_passengers (flight_id, name, seat, class, reason, notes) VALUES (?, ?, ?, ?, ?, ?)'
+        ).run(id, p.name, p.seat ?? null, p.class ?? null, p.reason ?? null, p.notes ?? null);
       }
       return id;
     });
@@ -115,8 +114,7 @@ export function createFlightsRouter(db: Db) {
           scheduled_departure = ?, actual_departure = ?,
           scheduled_arrival = ?, actual_arrival = ?,
           aircraft_type = ?, aircraft_registration = ?,
-          seat = ?, class = ?, reason = ?,
-          duration_minutes = ?, data_source = ?, notes = ?,
+          duration_minutes = ?, data_source = ?,
           updated_at = datetime('now')
         WHERE id = ?
       `).run(
@@ -126,14 +124,14 @@ export function createFlightsRouter(db: Db) {
         payload.scheduled_departure ?? null, payload.actual_departure ?? null,
         payload.scheduled_arrival ?? null, payload.actual_arrival ?? null,
         payload.aircraft_type ?? null, payload.aircraft_registration ?? null,
-        payload.seat ?? null, payload.class ?? null, payload.reason ?? null,
         payload.duration_minutes ?? null, payload.data_source ?? null,
-        payload.notes ?? null,
         id,
       );
       db.prepare('DELETE FROM flight_passengers WHERE flight_id = ?').run(id);
-      for (const name of (payload.passengers ?? [])) {
-        db.prepare('INSERT OR IGNORE INTO flight_passengers (flight_id, name) VALUES (?, ?)').run(id, name);
+      for (const p of (payload.passengers ?? [])) {
+        db.prepare(
+          'INSERT OR IGNORE INTO flight_passengers (flight_id, name, seat, class, reason, notes) VALUES (?, ?, ?, ?, ?, ?)'
+        ).run(id, p.name, p.seat ?? null, p.class ?? null, p.reason ?? null, p.notes ?? null);
       }
     });
 

@@ -11,17 +11,17 @@ vi.mock('../api/client');
 const mockPreview: ImportPreviewResponse = {
   passenger: 'Alice',
   toCreate: [
-    { flight_date: '2026-01-15', origin_iata: 'SFO', destination_iata: 'LAX', airline_name: 'United', flight_number: 'UA123', passengers: ['Alice'] },
-    { flight_date: '2026-02-20', origin_iata: 'LAX', destination_iata: 'JFK', airline_name: 'Delta', flight_number: 'DL456', passengers: ['Alice'] },
+    { flight_date: '2026-01-15', origin_iata: 'SFO', destination_iata: 'LAX', airline_name: 'United', flight_number: 'UA123', passengers: [{ name: 'Alice', seat: '14A', class: 'Economy' }] },
+    { flight_date: '2026-02-20', origin_iata: 'LAX', destination_iata: 'JFK', airline_name: 'Delta', flight_number: 'DL456', passengers: [{ name: 'Alice' }] },
   ],
   toMerge: [
     {
       existingId: 5,
       existingFlight: {
         id: 5, flight_date: '2026-03-10', origin_iata: 'SFO', destination_iata: 'LAS', airline_name: 'Southwest',
-        flight_number: 'WN789', passengers: ['Bob'], created_at: '', updated_at: '',
+        flight_number: 'WN789', passengers: [{ name: 'Bob' }], created_at: '', updated_at: '',
       },
-      incomingFlight: { flight_date: '2026-03-10', origin_iata: 'SFO', destination_iata: 'LAS', airline_name: 'Southwest', flight_number: 'WN789', passengers: ['Alice'] },
+      incomingFlight: { flight_date: '2026-03-10', origin_iata: 'SFO', destination_iata: 'LAS', airline_name: 'Southwest', flight_number: 'WN789', passengers: [{ name: 'Alice' }] },
     },
   ],
   skipped: [],
@@ -96,7 +96,7 @@ describe('ImportPage — Step 2 (Preview)', () => {
   it('skipped section is collapsed by default', async () => {
     const previewWithSkipped: ImportPreviewResponse = {
       ...mockPreview,
-      skipped: [{ flight_date: '2026-04-01', origin_iata: 'SFO', destination_iata: 'LAX', airline_name: 'United', flight_number: 'UA999', passengers: ['Alice'] }],
+      skipped: [{ flight_date: '2026-04-01', origin_iata: 'SFO', destination_iata: 'LAX', airline_name: 'United', flight_number: 'UA999', passengers: [{ name: 'Alice' }] }],
     };
     vi.mocked(client.importPreview).mockResolvedValue(previewWithSkipped);
 

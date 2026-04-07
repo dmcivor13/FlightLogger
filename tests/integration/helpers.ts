@@ -16,5 +16,5 @@ export const baseFlight = {
   destination_iata: 'LAX',
   airline_name: 'United',
   flight_number: 'UA123',
-  passengers: ['Alice'],
+  passengers: [{ name: 'Alice' }],
 } as const;

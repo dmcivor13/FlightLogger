@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach } from 'vitest';
+import { describe, it, expect } from 'vitest';
 import { createTestApp, baseFlight } from './helpers';
 
 describe('GET /api/flights', () => {
@@ -20,18 +20,24 @@ describe('GET /api/flights', () => {
 
   it('filters by passenger name', async () => {
     const { agent } = createTestApp();
-    await agent.post('/api/flights').send({ ...baseFlight, passengers: ['Alice'] });
-    await agent.post('/api/flights').send({ ...baseFlight, flight_number: 'UA999', passengers: ['Bob'] });
+    await agent.post('/api/flights').send({ ...baseFlight, passengers: [{ name: 'Alice' }] });
+    await agent.post('/api/flights').send({ ...baseFlight, flight_number: 'UA999', passengers: [{ name: 'Bob' }] });
     const res = await agent.get('/api/flights?passenger=Alice');
     expect(res.status).toBe(200);
     expect(res.body.flights).toHaveLength(1);
-    expect(res.body.flights[0].passengers).toContain('Alice');
+    expect(res.body.flights[0].passengers[0].name).toBe('Alice');
   });
 
-  it('free-text search across origin/destination/airline/notes', async () => {
+  it('free-text search finds flights via passenger notes', async () => {
     const { agent } = createTestApp();
-    await agent.post('/api/flights').send({ ...baseFlight, notes: 'bumpy ride' });
-    await agent.post('/api/flights').send({ ...baseFlight, flight_number: 'DL1', airline_name: 'Delta', notes: 'smooth' });
+    await agent.post('/api/flights').send({
+      ...baseFlight,
+      passengers: [{ name: 'Alice', notes: 'bumpy ride' }],
+    });
+    await agent.post('/api/flights').send({
+      ...baseFlight, flight_number: 'DL1', airline_name: 'Delta',
+      passengers: [{ name: 'Alice', notes: 'smooth' }],
+    });
     const res = await agent.get('/api/flights?q=bumpy');
     expect(res.status).toBe(200);
     expect(res.body.flights).toHaveLength(1);
@@ -46,10 +52,26 @@ describe('GET /api/flights', () => {
     expect(res.body.flights).toHaveLength(1);
     expect(res.body.flights[0].flight_date).toBe('2026-06-01');
   });
+
+  it('filters by class across passengers', async () => {
+    const { agent } = createTestApp();
+    await agent.post('/api/flights').send({
+      ...baseFlight,
+      passengers: [{ name: 'Alice', class: 'Business' }],
+    });
+    await agent.post('/api/flights').send({
+      ...baseFlight, flight_number: 'UA456',
+      passengers: [{ name: 'Alice', class: 'Economy' }],
+    });
+    const res = await agent.get('/api/flights?class=Business');
+    expect(res.status).toBe(200);
+    expect(res.body.flights).toHaveLength(1);
+    expect(res.body.flights[0].passengers[0].class).toBe('Business');
+  });
 });
 
 describe('POST /api/flights', () => {
-  it('creates a flight and returns 201 with all fields', async () => {
+  it('creates a flight and returns 201 with per-passenger fields', async () => {
     const { agent } = createTestApp();
     const payload = {
       ...baseFlight,
@@ -57,11 +79,10 @@ describe('POST /api/flights', () => {
       scheduled_arrival: '10:15',
       aircraft_type: 'Boeing 737-800',
       aircraft_registration: 'N12345',
-      seat: '14A',
-      class: 'Economy',
-      reason: 'Leisure',
-      notes: 'Great flight',
-      passengers: ['Alice', 'Bob'],
+      passengers: [
+        { name: 'Alice', seat: '14A', class: 'Economy', reason: 'Leisure', notes: 'Great flight' },
+        { name: 'Bob',   seat: '14B', class: 'Economy' },
+      ],
     };
     const res = await agent.post('/api/flights').send(payload);
     expect(res.status).toBe(201);
@@ -71,10 +92,13 @@ describe('POST /api/flights', () => {
     expect(res.body.destination_iata).toBe('LAX');
     expect(res.body.airline_name).toBe('United');
     expect(res.body.aircraft_type).toBe('Boeing 737-800');
-    expect(res.body.seat).toBe('14A');
-    expect(res.body.class).toBe('Economy');
-    expect(res.body.reason).toBe('Leisure');
-    expect(res.body.passengers).toEqual(expect.arrayContaining(['Alice', 'Bob']));
+    const alice = res.body.passengers.find((p: { name: string }) => p.name === 'Alice');
+    expect(alice.seat).toBe('14A');
+    expect(alice.class).toBe('Economy');
+    expect(alice.reason).toBe('Leisure');
+    expect(alice.notes).toBe('Great flight');
+    const bob = res.body.passengers.find((p: { name: string }) => p.name === 'Bob');
+    expect(bob.seat).toBe('14B');
   });
 
   it('returns 400 when required fields are missing', async () => {
@@ -85,13 +109,13 @@ describe('POST /api/flights', () => {
 });
 
 describe('GET /api/flights/:id', () => {
-  it('returns a single flight by id', async () => {
+  it('returns a single flight by id with passengers as objects', async () => {
     const { agent } = createTestApp();
     const created = await agent.post('/api/flights').send(baseFlight);
     const res = await agent.get(`/api/flights/${created.body.id}`);
     expect(res.status).toBe(200);
     expect(res.body.id).toBe(created.body.id);
-    expect(res.body.passengers).toContain('Alice');
+    expect(res.body.passengers[0].name).toBe('Alice');
   });
 
   it('returns 404 for unknown id', async () => {
@@ -102,29 +126,32 @@ describe('GET /api/flights/:id', () => {
 });
 
 describe('PUT /api/flights/:id', () => {
-  it('updates flight fields', async () => {
+  it('updates per-passenger fields', async () => {
     const { agent } = createTestApp();
     const created = await agent.post('/api/flights').send(baseFlight);
     const res = await agent.put(`/api/flights/${created.body.id}`).send({
       ...baseFlight,
-      notes: 'Updated notes',
-      seat: '2A',
-      passengers: ['Alice'],
+      passengers: [{ name: 'Alice', seat: '2A', notes: 'Updated notes' }],
     });
     expect(res.status).toBe(200);
-    expect(res.body.notes).toBe('Updated notes');
-    expect(res.body.seat).toBe('2A');
+    const alice = res.body.passengers.find((p: { name: string }) => p.name === 'Alice');
+    expect(alice.seat).toBe('2A');
+    expect(alice.notes).toBe('Updated notes');
   });
 
   it('replaces passengers on update', async () => {
     const { agent } = createTestApp();
-    const created = await agent.post('/api/flights').send({ ...baseFlight, passengers: ['Alice', 'Bob'] });
+    const created = await agent.post('/api/flights').send({
+      ...baseFlight,
+      passengers: [{ name: 'Alice' }, { name: 'Bob' }],
+    });
     const res = await agent.put(`/api/flights/${created.body.id}`).send({
       ...baseFlight,
-      passengers: ['Carol'],
+      passengers: [{ name: 'Carol' }],
     });
     expect(res.status).toBe(200);
-    expect(res.body.passengers).toEqual(['Carol']);
+    expect(res.body.passengers).toHaveLength(1);
+    expect(res.body.passengers[0].name).toBe('Carol');
   });
 
   it('returns 404 for unknown id', async () => {

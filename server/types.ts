@@ -1,6 +1,14 @@
 export type ClassOfService = 'Economy' | 'Premium Economy' | 'Business' | 'First';
 export type FlightReason = 'Business' | 'Leisure';
 
+export interface PassengerDetail {
+  name: string;
+  seat?: string;
+  class?: ClassOfService;
+  reason?: FlightReason;
+  notes?: string;
+}
+
 export interface FlightPayload {
   flight_date: string;          // ISO date: "2026-04-06"
 
@@ -21,15 +29,10 @@ export interface FlightPayload {
   aircraft_type?: string;       // e.g. "Boeing 737-800"
   aircraft_registration?: string; // e.g. "G-XLEB"
 
-  seat?: string;
-  class?: ClassOfService;
-  reason?: FlightReason;
-
   duration_minutes?: number;
   data_source?: string;
 
-  notes?: string;
-  passengers: string[];
+  passengers: PassengerDetail[];
 }
 
 export interface FlightRecord extends FlightPayload {

@@ -13,8 +13,8 @@ export function createStatsRouter(db: Db) {
     const byYear      = db.prepare("SELECT strftime('%Y', flight_date) as year, COUNT(*) as count FROM flights GROUP BY year ORDER BY year DESC").all();
     const byAirline   = db.prepare("SELECT airline_name as airline, COUNT(*) as count FROM flights GROUP BY airline_name ORDER BY count DESC").all();
     const byAircraft  = db.prepare("SELECT aircraft_type as aircraft, COUNT(*) as count FROM flights WHERE aircraft_type IS NOT NULL AND aircraft_type != '' GROUP BY aircraft_type ORDER BY count DESC").all();
-    const byClass     = db.prepare("SELECT class, COUNT(*) as count FROM flights WHERE class IS NOT NULL GROUP BY class ORDER BY count DESC").all();
-    const byReason    = db.prepare("SELECT reason, COUNT(*) as count FROM flights WHERE reason IS NOT NULL GROUP BY reason ORDER BY count DESC").all();
+    const byClass     = db.prepare("SELECT class, COUNT(*) as count FROM flight_passengers WHERE class IS NOT NULL GROUP BY class ORDER BY count DESC").all();
+    const byReason    = db.prepare("SELECT reason, COUNT(*) as count FROM flight_passengers WHERE reason IS NOT NULL GROUP BY reason ORDER BY count DESC").all();
     const byPassenger = db.prepare('SELECT name as passenger, COUNT(*) as count FROM flight_passengers GROUP BY name ORDER BY count DESC').all();
     const topRoutes   = db.prepare('SELECT origin_iata as origin, destination_iata as destination, COUNT(*) as count FROM flights GROUP BY origin_iata, destination_iata ORDER BY count DESC LIMIT 20').all();
 

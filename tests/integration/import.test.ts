@@ -189,20 +189,23 @@ describe('import pure functions', () => {
       'note': 'Great flight',
     };
     const result = mapFr24Row(row);
-    expect(result?.flight_date).toBe('2026-01-15');
-    expect(result?.flight_number).toBe('UA123');
-    expect(result?.origin_iata).toBe('SFO');
-    expect(result?.destination_iata).toBe('LAX');
-    expect(result?.airline_name).toBe('United Airlines');
-    expect(result?.airline_iata).toBe('UA');
-    expect(result?.aircraft_type).toBe('Boeing 737-800');
-    expect(result?.aircraft_registration).toBe('N12345');
-    expect(result?.scheduled_departure).toBe('08:30');
-    expect(result?.scheduled_arrival).toBe('10:15');
-    expect(result?.class).toBe('Economy');
-    expect(result?.reason).toBe('Leisure');
-    expect(result?.duration_minutes).toBe(105);
-    expect(result?.notes).toBe('Great flight');
-    expect(result?.data_source).toBe('flightradar24_csv');
+    // Flight-level fields
+    expect(result?.flight.flight_date).toBe('2026-01-15');
+    expect(result?.flight.flight_number).toBe('UA123');
+    expect(result?.flight.origin_iata).toBe('SFO');
+    expect(result?.flight.destination_iata).toBe('LAX');
+    expect(result?.flight.airline_name).toBe('United Airlines');
+    expect(result?.flight.airline_iata).toBe('UA');
+    expect(result?.flight.aircraft_type).toBe('Boeing 737-800');
+    expect(result?.flight.aircraft_registration).toBe('N12345');
+    expect(result?.flight.scheduled_departure).toBe('08:30');
+    expect(result?.flight.scheduled_arrival).toBe('10:15');
+    expect(result?.flight.duration_minutes).toBe(105);
+    expect(result?.flight.data_source).toBe('flightradar24_csv');
+    // Per-passenger fields
+    expect(result?.passengerFields.seat).toBe('14A');
+    expect(result?.passengerFields.class).toBe('Economy');
+    expect(result?.passengerFields.reason).toBe('Leisure');
+    expect(result?.passengerFields.notes).toBe('Great flight');
   });
 });

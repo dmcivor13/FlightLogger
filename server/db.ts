@@ -7,10 +7,11 @@ const __dirname = path.dirname(__filename);
 // Schema version history:
 // 0 → 1: Rename columns, add airline_iata, actual times, reason, duration_minutes, data_source,
 //         composite index on (flight_date, flight_number), UNIQUE on flight_passengers(flight_id, name)
+// 1 → 2: Move seat, class, reason, notes from flights to flight_passengers (per-passenger attributes)
 
-const CURRENT_VERSION = 1;
+const CURRENT_VERSION = 2;
 
-const DDL_V1 = `
+const DDL_V2 = `
   CREATE TABLE IF NOT EXISTS flights (
     id                    INTEGER PRIMARY KEY AUTOINCREMENT,
 
@@ -33,15 +34,8 @@ const DDL_V1 = `
     aircraft_type         TEXT,
     aircraft_registration TEXT,
 
-    seat                  TEXT,
-
-    class                 TEXT    CHECK(class IN ('Economy', 'Premium Economy', 'Business', 'First')),
-    reason                TEXT    CHECK(reason IN ('Business', 'Leisure')),
-
     duration_minutes      INTEGER,
     data_source           TEXT,
-
-    notes                 TEXT,
 
     created_at            TEXT    NOT NULL DEFAULT (datetime('now')),
     updated_at            TEXT    NOT NULL DEFAULT (datetime('now'))
@@ -51,6 +45,10 @@ const DDL_V1 = `
     id        INTEGER PRIMARY KEY AUTOINCREMENT,
     flight_id INTEGER NOT NULL REFERENCES flights(id) ON DELETE CASCADE,
     name      TEXT    NOT NULL,
+    seat      TEXT,
+    class     TEXT    CHECK(class IN ('Economy', 'Premium Economy', 'Business', 'First')),
+    reason    TEXT    CHECK(reason IN ('Business', 'Leisure')),
+    notes     TEXT,
     UNIQUE(flight_id, name)
   );
 
@@ -63,19 +61,30 @@ const DDL_V1 = `
 `;
 
 function migrate(db: ReturnType<typeof Database>): void {
-  const currentVersion = (db.pragma('user_version', { simple: true }) as number);
+  let version = (db.pragma('user_version', { simple: true }) as number);
 
-  if (currentVersion >= CURRENT_VERSION) return;
+  if (version >= CURRENT_VERSION) return;
 
-  // Version 0 → 1: rename old columns to new schema
-  if (currentVersion === 0) {
+  // Version 0: either an old pre-v1 database or a completely fresh one
+  if (version === 0) {
+    const hasAnyFlightsTable = db.prepare(
+      "SELECT 1 FROM sqlite_master WHERE type='table' AND name='flights'"
+    ).get();
+
+    if (!hasAnyFlightsTable) {
+      // Completely fresh database — create v2 schema directly
+      db.exec(DDL_V2);
+      db.pragma('user_version = 2');
+      return;
+    }
+
+    // Old pre-v1 schema: has flights table with legacy column names (date, airline, origin, etc.)
     const hasOldSchema = db.prepare(
       "SELECT 1 FROM sqlite_master WHERE type='table' AND name='flights' AND sql LIKE '%date%NOT NULL%'"
     ).get();
 
     if (hasOldSchema) {
       db.exec(`
-        -- Migrate flights table
         CREATE TABLE flights_v1 (
           id                    INTEGER PRIMARY KEY AUTOINCREMENT,
           flight_date           TEXT    NOT NULL,
@@ -118,7 +127,6 @@ function migrate(db: ReturnType<typeof Database>): void {
         DROP TABLE flights;
         ALTER TABLE flights_v1 RENAME TO flights;
 
-        -- Recreate flight_passengers with UNIQUE constraint
         CREATE TABLE flight_passengers_v1 (
           id        INTEGER PRIMARY KEY AUTOINCREMENT,
           flight_id INTEGER NOT NULL REFERENCES flights(id) ON DELETE CASCADE,
@@ -139,12 +147,77 @@ function migrate(db: ReturnType<typeof Database>): void {
         CREATE INDEX IF NOT EXISTS idx_fp_flight_id          ON flight_passengers(flight_id);
         CREATE INDEX IF NOT EXISTS idx_fp_name               ON flight_passengers(name);
       `);
-    } else {
-      // Fresh database — create v1 schema directly
-      db.exec(DDL_V1);
     }
 
-    db.pragma(`user_version = ${CURRENT_VERSION}`);
+    db.pragma('user_version = 1');
+    version = 1;
+  }
+
+  // Version 1 → 2: move seat/class/reason/notes from flights to flight_passengers
+  if (version === 1) {
+    db.exec(`
+      ALTER TABLE flight_passengers ADD COLUMN seat   TEXT;
+      ALTER TABLE flight_passengers ADD COLUMN class  TEXT
+        CHECK(class IN ('Economy', 'Premium Economy', 'Business', 'First'));
+      ALTER TABLE flight_passengers ADD COLUMN reason TEXT
+        CHECK(reason IN ('Business', 'Leisure'));
+      ALTER TABLE flight_passengers ADD COLUMN notes  TEXT;
+
+      UPDATE flight_passengers SET
+        seat   = (SELECT seat   FROM flights WHERE flights.id = flight_passengers.flight_id),
+        class  = (SELECT class  FROM flights WHERE flights.id = flight_passengers.flight_id),
+        reason = (SELECT reason FROM flights WHERE flights.id = flight_passengers.flight_id),
+        notes  = (SELECT notes  FROM flights WHERE flights.id = flight_passengers.flight_id);
+
+      CREATE TABLE flights_v2 (
+        id                    INTEGER PRIMARY KEY AUTOINCREMENT,
+        flight_date           TEXT    NOT NULL,
+        airline_iata          TEXT,
+        airline_name          TEXT    NOT NULL,
+        flight_number         TEXT,
+        origin_iata           TEXT    NOT NULL,
+        destination_iata      TEXT    NOT NULL,
+        scheduled_departure   TEXT,
+        actual_departure      TEXT,
+        scheduled_arrival     TEXT,
+        actual_arrival        TEXT,
+        aircraft_type         TEXT,
+        aircraft_registration TEXT,
+        duration_minutes      INTEGER,
+        data_source           TEXT,
+        created_at            TEXT    NOT NULL DEFAULT (datetime('now')),
+        updated_at            TEXT    NOT NULL DEFAULT (datetime('now'))
+      );
+
+      INSERT INTO flights_v2 (
+        id, flight_date, airline_iata, airline_name, flight_number,
+        origin_iata, destination_iata,
+        scheduled_departure, actual_departure,
+        scheduled_arrival, actual_arrival,
+        aircraft_type, aircraft_registration,
+        duration_minutes, data_source,
+        created_at, updated_at
+      )
+      SELECT
+        id, flight_date, airline_iata, airline_name, flight_number,
+        origin_iata, destination_iata,
+        scheduled_departure, actual_departure,
+        scheduled_arrival, actual_arrival,
+        aircraft_type, aircraft_registration,
+        duration_minutes, data_source,
+        created_at, updated_at
+      FROM flights;
+
+      DROP TABLE flights;
+      ALTER TABLE flights_v2 RENAME TO flights;
+
+      CREATE INDEX IF NOT EXISTS idx_flights_date          ON flights(flight_date);
+      CREATE INDEX IF NOT EXISTS idx_flights_flight_number ON flights(flight_number);
+      CREATE INDEX IF NOT EXISTS idx_flights_aircraft_reg  ON flights(aircraft_registration);
+      CREATE INDEX IF NOT EXISTS idx_flights_date_num      ON flights(flight_date, flight_number);
+    `);
+
+    db.pragma('user_version = 2');
   }
 }
 

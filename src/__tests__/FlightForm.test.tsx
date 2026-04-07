@@ -9,7 +9,7 @@ const baseValues = {
   destination_iata: 'LAX',
   airline_name: 'United',
   flight_number: 'UA123',
-  passengers: [] as string[],
+  passengers: [] as { name: string }[],
 };
 
 describe('FlightForm', () => {
@@ -39,7 +39,7 @@ describe('FlightForm', () => {
     expect(onSubmit).not.toHaveBeenCalled();
   });
 
-  it('adds a passenger tag when the add button is clicked', async () => {
+  it('adds a passenger card when the add button is clicked', async () => {
     const onSubmit = vi.fn().mockResolvedValue(undefined);
     const user = userEvent.setup();
     render(<FlightForm initialValues={baseValues} onSubmit={onSubmit} onCancel={vi.fn()} />);
@@ -51,12 +51,12 @@ describe('FlightForm', () => {
     expect(screen.getByText('Bob')).toBeInTheDocument();
   });
 
-  it('removes a passenger tag when the remove button is clicked', async () => {
+  it('removes a passenger card when the remove button is clicked', async () => {
     const onSubmit = vi.fn().mockResolvedValue(undefined);
     const user = userEvent.setup();
     render(
       <FlightForm
-        initialValues={{ ...baseValues, passengers: ['Alice'] }}
+        initialValues={{ ...baseValues, passengers: [{ name: 'Alice' }] }}
         onSubmit={onSubmit}
         onCancel={vi.fn()}
       />,
@@ -67,12 +67,18 @@ describe('FlightForm', () => {
     expect(screen.queryByText('Alice')).not.toBeInTheDocument();
   });
 
-  it('includes passengers in submitted payload', async () => {
+  it('includes passengers with per-passenger fields in submitted payload', async () => {
     const onSubmit = vi.fn().mockResolvedValue(undefined);
     const user = userEvent.setup();
     render(
       <FlightForm
-        initialValues={{ ...baseValues, passengers: ['Alice', 'Bob'] }}
+        initialValues={{
+          ...baseValues,
+          passengers: [
+            { name: 'Alice', seat: '3A', class: 'Business' },
+            { name: 'Bob' },
+          ],
+        }}
         onSubmit={onSubmit}
         onCancel={vi.fn()}
       />,
@@ -80,7 +86,12 @@ describe('FlightForm', () => {
 
     await user.click(screen.getByRole('button', { name: /save/i }));
     await waitFor(() => expect(onSubmit).toHaveBeenCalledOnce());
-    expect(onSubmit.mock.calls[0][0].passengers).toEqual(expect.arrayContaining(['Alice', 'Bob']));
+    const passengers = onSubmit.mock.calls[0][0].passengers;
+    expect(passengers).toHaveLength(2);
+    const alice = passengers.find((p: { name: string }) => p.name === 'Alice');
+    expect(alice.seat).toBe('3A');
+    expect(alice.class).toBe('Business');
+    expect(passengers.find((p: { name: string }) => p.name === 'Bob')).toBeDefined();
   });
 
   it('calls onCancel when cancel button is clicked', async () => {

@@ -2,26 +2,35 @@ import { describe, it, expect } from 'vitest';
 import { createTestApp } from './helpers';
 
 async function seedKnownFlights(agent: ReturnType<typeof createTestApp>['agent']) {
-  // 3 x Economy, 1 x Business
-  // 2 airlines: United (3), Delta (1)
-  // 2 years: 2024 (2), 2026 (2)
-  // 2 passengers: Alice (all 4), Bob (2)
-  // Top route: SFO→LAX (2 times), SFO→SEA (1), SFO→ORD (1)
+  // Flights and passengers:
+  // UA100: Alice(Economy) + Bob(Economy) — 2024
+  // UA200: Alice(Economy)               — 2024
+  // UA300: Alice(Economy) + Bob(Economy) — 2026
+  // DL400: Alice(Business)              — 2026
+  //
+  // byClass counts (per passenger-flight): Economy=5, Business=1
+  // byYear: 2024=2 flights, 2026=2 flights
+  // byAirline: United=3, Delta=1
+  // byPassenger: Alice=4, Bob=2
   await agent.post('/api/flights').send({
     flight_date: '2024-03-10', origin_iata: 'SFO', destination_iata: 'LAX', airline_name: 'United',
-    flight_number: 'UA100', class: 'Economy', passengers: ['Alice', 'Bob'],
+    flight_number: 'UA100',
+    passengers: [{ name: 'Alice', class: 'Economy' }, { name: 'Bob', class: 'Economy' }],
   });
   await agent.post('/api/flights').send({
     flight_date: '2024-07-20', origin_iata: 'SFO', destination_iata: 'SEA', airline_name: 'United',
-    flight_number: 'UA200', class: 'Economy', passengers: ['Alice'],
+    flight_number: 'UA200',
+    passengers: [{ name: 'Alice', class: 'Economy' }],
   });
   await agent.post('/api/flights').send({
     flight_date: '2026-01-05', origin_iata: 'SFO', destination_iata: 'LAX', airline_name: 'United',
-    flight_number: 'UA300', class: 'Economy', passengers: ['Alice', 'Bob'],
+    flight_number: 'UA300',
+    passengers: [{ name: 'Alice', class: 'Economy' }, { name: 'Bob', class: 'Economy' }],
   });
   await agent.post('/api/flights').send({
     flight_date: '2026-04-01', origin_iata: 'SFO', destination_iata: 'ORD', airline_name: 'Delta',
-    flight_number: 'DL400', class: 'Business', passengers: ['Alice'],
+    flight_number: 'DL400',
+    passengers: [{ name: 'Alice', class: 'Business' }],
   });
 }
 
@@ -62,14 +71,15 @@ describe('GET /api/stats', () => {
     expect(united?.count).toBe(3);
   });
 
-  it('returns correct byClass breakdown', async () => {
+  it('returns correct byClass breakdown (counts per passenger-flight)', async () => {
     const { agent } = createTestApp();
     await seedKnownFlights(agent);
     const res = await agent.get('/api/stats');
     const classes = res.body.byClass as Array<{ class: string; count: number }>;
     const economy = classes.find((c) => c.class === 'Economy');
     const business = classes.find((c) => c.class === 'Business');
-    expect(economy?.count).toBe(3);
+    // Economy: Alice×3 + Bob×2 = 5 passenger-flights
+    expect(economy?.count).toBe(5);
     expect(business?.count).toBe(1);
   });
 

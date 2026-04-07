@@ -97,27 +97,33 @@ export function FlightDetailPage() {
             {Math.floor(flight.duration_minutes / 60)}h {flight.duration_minutes % 60}m
           </DetailRow>
         )}
-        {flight.seat && <DetailRow label="Seat">{flight.seat}</DetailRow>}
-        {flight.class && (
-          <DetailRow label="Class">
-            <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${CLASS_COLOURS[flight.class] ?? ''}`}>
-              {flight.class}
-            </span>
-          </DetailRow>
-        )}
-        {flight.reason && (
-          <DetailRow label="Reason">
-            <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${REASON_COLOURS[flight.reason] ?? ''}`}>
-              {flight.reason}
-            </span>
-          </DetailRow>
-        )}
-        {flight.notes && <DetailRow label="Notes">{flight.notes}</DetailRow>}
         {flight.passengers.length > 0 && (
           <DetailRow label="Passengers">
-            <div className="flex flex-wrap gap-1">
+            <div className="space-y-2 w-full">
               {flight.passengers.map((p) => (
-                <span key={p} className="text-xs bg-blue-50 text-blue-700 px-2 py-0.5 rounded-full">{p}</span>
+                <div key={p.name} className="space-y-1">
+                  <div className="flex flex-wrap items-center gap-1.5">
+                    <span className="text-sm font-medium text-slate-800">{p.name}</span>
+                    {p.seat && (
+                      <span className="text-xs bg-slate-100 text-slate-600 px-2 py-0.5 rounded-full">
+                        Seat {p.seat}
+                      </span>
+                    )}
+                    {p.class && (
+                      <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${CLASS_COLOURS[p.class] ?? ''}`}>
+                        {p.class}
+                      </span>
+                    )}
+                    {p.reason && (
+                      <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${REASON_COLOURS[p.reason] ?? ''}`}>
+                        {p.reason}
+                      </span>
+                    )}
+                  </div>
+                  {p.notes && (
+                    <p className="text-xs text-slate-500 ml-0.5">{p.notes}</p>
+                  )}
+                </div>
               ))}
             </div>
           </DetailRow>
@@ -131,7 +137,7 @@ function DetailRow({ label, children }: { label: string; children: React.ReactNo
   return (
     <div className="flex px-4 py-3 gap-4">
       <span className="text-sm text-slate-500 w-28 shrink-0">{label}</span>
-      <span className="text-sm text-slate-900">{children}</span>
+      <span className="text-sm text-slate-900 flex-1">{children}</span>
     </div>
   );
 }

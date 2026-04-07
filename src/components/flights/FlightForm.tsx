@@ -1,9 +1,9 @@
 import { useState, FormEvent } from 'react';
-import type { FlightPayload, ClassOfService, FlightReason, NormalizedFlightCandidate } from '../../types';
+import type { FlightPayload, PassengerDetail, ClassOfService, FlightReason, NormalizedFlightCandidate } from '../../types';
 import { lookupFlight } from '../../api/client';
 
 interface Props {
-  initialValues?: Partial<FlightPayload>;
+  initialValues?: Partial<Omit<FlightPayload, 'passengers'>> & { passengers?: PassengerDetail[] };
   onSubmit: (data: FlightPayload) => Promise<void>;
   onCancel: () => void;
 }
@@ -24,21 +24,17 @@ export function FlightForm({ initialValues = {}, onSubmit, onCancel }: Props) {
   const [actualArr, setActualArr]             = useState(initialValues.actual_arrival ?? '');
   const [aircraftType, setAircraftType]       = useState(initialValues.aircraft_type ?? '');
   const [aircraftReg, setAircraftReg]         = useState(initialValues.aircraft_registration ?? '');
-  const [seat, setSeat]                       = useState(initialValues.seat ?? '');
-  const [cls, setCls]                         = useState<ClassOfService | ''>(initialValues.class ?? '');
-  const [reason, setReason]                   = useState<FlightReason | ''>(initialValues.reason ?? '');
-  const [notes, setNotes]                     = useState(initialValues.notes ?? '');
-  const [passengers, setPassengers]           = useState<string[]>(initialValues.passengers ?? []);
+  const [passengers, setPassengers]           = useState<PassengerDetail[]>(initialValues.passengers ?? []);
   const [passengerInput, setPassengerInput]   = useState('');
   const [submitting, setSubmitting]           = useState(false);
   const [errors, setErrors]                   = useState<Record<string, string>>({});
 
   // Lookup state
-  const [lookupCode, setLookupCode]     = useState('');
-  const [lookupDate, setLookupDate]     = useState(initialValues.flight_date ?? '');
-  const [lookupStatus, setLookupStatus] = useState<'idle' | 'loading' | 'found' | 'multiple' | 'notfound' | 'error'>('idle');
+  const [lookupCode, setLookupCode]         = useState('');
+  const [lookupDate, setLookupDate]         = useState(initialValues.flight_date ?? '');
+  const [lookupStatus, setLookupStatus]     = useState<'idle' | 'loading' | 'found' | 'multiple' | 'notfound' | 'error'>('idle');
   const [lookupMessage, setLookupMessage]   = useState('');
-  const [candidates, setCandidates]     = useState<NormalizedFlightCandidate[]>([]);
+  const [candidates, setCandidates]         = useState<NormalizedFlightCandidate[]>([]);
 
   function applyCandidate(c: NormalizedFlightCandidate, filled: string[]) {
     if (c.originIata)           { setOriginIata(c.originIata);             filled.push('Origin'); }
@@ -103,14 +99,20 @@ export function FlightForm({ initialValues = {}, onSubmit, onCancel }: Props) {
 
   function addPassenger() {
     const name = passengerInput.trim();
-    if (name && !passengers.includes(name)) {
-      setPassengers([...passengers, name]);
+    if (name && !passengers.some((p) => p.name === name)) {
+      setPassengers([...passengers, { name }]);
     }
     setPassengerInput('');
   }
 
   function removePassenger(name: string) {
-    setPassengers(passengers.filter((p) => p !== name));
+    setPassengers(passengers.filter((p) => p.name !== name));
+  }
+
+  function updatePassenger(name: string, field: keyof Omit<PassengerDetail, 'name'>, value: string) {
+    setPassengers(passengers.map((p) =>
+      p.name === name ? { ...p, [field]: value || undefined } : p
+    ));
   }
 
   async function handleSubmit(e: FormEvent) {
@@ -131,10 +133,6 @@ export function FlightForm({ initialValues = {}, onSubmit, onCancel }: Props) {
         actual_arrival: actualArr || undefined,
         aircraft_type: aircraftType || undefined,
         aircraft_registration: aircraftReg || undefined,
-        seat: seat || undefined,
-        class: (cls as ClassOfService) || undefined,
-        reason: (reason as FlightReason) || undefined,
-        notes: notes || undefined,
         passengers,
       });
     } finally {
@@ -296,59 +294,12 @@ export function FlightForm({ initialValues = {}, onSubmit, onCancel }: Props) {
             className="input"
           />
         </Field>
-        <Field label="Seat">
-          <input
-            type="text"
-            placeholder="e.g. 14A"
-            value={seat}
-            onChange={(e) => setSeat(e.target.value)}
-            className="input"
-          />
-        </Field>
-        <Field label="Class" htmlFor="class-select">
-          <select
-            id="class-select"
-            aria-label="Class"
-            value={cls}
-            onChange={(e) => setCls(e.target.value as ClassOfService | '')}
-            className="input"
-          >
-            <option value="">— select —</option>
-            {CLASS_OPTIONS.map((c) => (
-              <option key={c} value={c}>{c}</option>
-            ))}
-          </select>
-        </Field>
-        <Field label="Reason" htmlFor="reason-select">
-          <select
-            id="reason-select"
-            aria-label="Reason"
-            value={reason}
-            onChange={(e) => setReason(e.target.value as FlightReason | '')}
-            className="input"
-          >
-            <option value="">— select —</option>
-            {REASON_OPTIONS.map((r) => (
-              <option key={r} value={r}>{r}</option>
-            ))}
-          </select>
-        </Field>
       </div>
-
-      <Field label="Notes">
-        <textarea
-          value={notes}
-          onChange={(e) => setNotes(e.target.value)}
-          rows={3}
-          className="input"
-          placeholder="Any notes about this flight…"
-        />
-      </Field>
 
       {/* Passengers */}
       <div>
-        <label className="block text-sm font-medium text-slate-700 mb-1">Passengers</label>
-        <div className="flex gap-2 mb-2">
+        <label className="block text-sm font-medium text-slate-700 mb-2">Passengers</label>
+        <div className="flex gap-2 mb-3">
           <input
             type="text"
             placeholder="Add passenger name"
@@ -368,19 +319,69 @@ export function FlightForm({ initialValues = {}, onSubmit, onCancel }: Props) {
           </button>
         </div>
         {passengers.length > 0 && (
-          <div className="flex flex-wrap gap-2">
-            {passengers.map((name) => (
-              <span key={name} className="inline-flex items-center gap-1 bg-blue-100 text-blue-800 text-sm px-2 py-0.5 rounded-full">
-                {name}
-                <button
-                  type="button"
-                  onClick={() => removePassenger(name)}
-                  aria-label={`Remove ${name}`}
-                  className="text-blue-600 hover:text-blue-900 leading-none"
-                >
-                  ×
-                </button>
-              </span>
+          <div className="space-y-2">
+            {passengers.map((p) => (
+              <div key={p.name} className="border border-slate-200 rounded-lg p-3 bg-slate-50">
+                <div className="flex items-center justify-between mb-2">
+                  <span className="text-sm font-medium text-slate-800">{p.name}</span>
+                  <button
+                    type="button"
+                    onClick={() => removePassenger(p.name)}
+                    aria-label={`Remove ${p.name}`}
+                    className="text-slate-400 hover:text-slate-700 text-lg leading-none"
+                  >
+                    ×
+                  </button>
+                </div>
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                  <div>
+                    <label className="block text-xs text-slate-500 mb-1">Seat</label>
+                    <input
+                      type="text"
+                      placeholder="e.g. 14A"
+                      value={p.seat ?? ''}
+                      onChange={(e) => updatePassenger(p.name, 'seat', e.target.value)}
+                      className="input text-sm"
+                      aria-label={`Seat for ${p.name}`}
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs text-slate-500 mb-1">Class</label>
+                    <select
+                      value={p.class ?? ''}
+                      onChange={(e) => updatePassenger(p.name, 'class', e.target.value)}
+                      className="input text-sm"
+                      aria-label={`Class for ${p.name}`}
+                    >
+                      <option value="">—</option>
+                      {CLASS_OPTIONS.map((c) => <option key={c} value={c}>{c}</option>)}
+                    </select>
+                  </div>
+                  <div>
+                    <label className="block text-xs text-slate-500 mb-1">Reason</label>
+                    <select
+                      value={p.reason ?? ''}
+                      onChange={(e) => updatePassenger(p.name, 'reason', e.target.value)}
+                      className="input text-sm"
+                      aria-label={`Reason for ${p.name}`}
+                    >
+                      <option value="">—</option>
+                      {REASON_OPTIONS.map((r) => <option key={r} value={r}>{r}</option>)}
+                    </select>
+                  </div>
+                  <div className="col-span-2 sm:col-span-4">
+                    <label className="block text-xs text-slate-500 mb-1">Notes</label>
+                    <input
+                      type="text"
+                      placeholder="Any notes…"
+                      value={p.notes ?? ''}
+                      onChange={(e) => updatePassenger(p.name, 'notes', e.target.value)}
+                      className="input text-sm w-full"
+                      aria-label={`Notes for ${p.name}`}
+                    />
+                  </div>
+                </div>
+              </div>
             ))}
           </div>
         )}
