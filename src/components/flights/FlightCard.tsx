@@ -6,6 +6,7 @@ const CLASS_COLOURS: Record<string, string> = {
   Economy: 'bg-slate-100 text-slate-700',
   'Premium Economy': 'bg-indigo-100 text-indigo-700',
   Business: 'bg-blue-100 text-blue-700',
+  'US Domestic First': 'bg-cyan-100 text-cyan-700',
   First: 'bg-amber-100 text-amber-700',
 };
 

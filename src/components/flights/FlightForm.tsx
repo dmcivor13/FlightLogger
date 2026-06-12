@@ -8,7 +8,7 @@ interface Props {
   onCancel: () => void;
 }
 
-const CLASS_OPTIONS: ClassOfService[] = ['Economy', 'Premium Economy', 'Business', 'First'];
+const CLASS_OPTIONS: ClassOfService[] = ['Economy', 'Premium Economy', 'Business', 'US Domestic First', 'First'];
 const REASON_OPTIONS: FlightReason[] = ['Leisure', 'Business'];
 
 export function FlightForm({ initialValues = {}, onSubmit, onCancel }: Props) {

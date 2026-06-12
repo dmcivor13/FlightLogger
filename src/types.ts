@@ -1,4 +1,4 @@
-export type ClassOfService = 'Economy' | 'Premium Economy' | 'Business' | 'First';
+export type ClassOfService = 'Economy' | 'Premium Economy' | 'Business' | 'US Domestic First' | 'First';
 export type FlightReason = 'Business' | 'Leisure';
 
 export interface PassengerDetail {

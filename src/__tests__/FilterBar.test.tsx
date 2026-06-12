@@ -38,7 +38,7 @@ describe('FilterBar', () => {
     render(<FilterBar filters={{}} onChange={vi.fn()} />);
     const select = screen.getByRole('combobox', { name: /class/i });
     expect(select).toBeInTheDocument();
-    ['Economy', 'Premium Economy', 'Business', 'First'].forEach((cls) => {
+    ['Economy', 'Premium Economy', 'Business', 'US Domestic First', 'First'].forEach((cls) => {
       expect(within(select).getByRole('option', { name: cls })).toBeInTheDocument();
     });
   });

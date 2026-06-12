@@ -8,10 +8,11 @@ const __dirname = path.dirname(__filename);
 // 0 → 1: Rename columns, add airline_iata, actual times, reason, duration_minutes, data_source,
 //         composite index on (flight_date, flight_number), UNIQUE on flight_passengers(flight_id, name)
 // 1 → 2: Move seat, class, reason, notes from flights to flight_passengers (per-passenger attributes)
+// 2 → 3: Expand class CHECK constraint to include 'US Domestic First'
 
-const CURRENT_VERSION = 2;
+const CURRENT_VERSION = 3;
 
-const DDL_V2 = `
+const DDL_V3 = `
   CREATE TABLE IF NOT EXISTS flights (
     id                    INTEGER PRIMARY KEY AUTOINCREMENT,
 
@@ -46,7 +47,7 @@ const DDL_V2 = `
     flight_id INTEGER NOT NULL REFERENCES flights(id) ON DELETE CASCADE,
     name      TEXT    NOT NULL,
     seat      TEXT,
-    class     TEXT    CHECK(class IN ('Economy', 'Premium Economy', 'Business', 'First')),
+    class     TEXT    CHECK(class IN ('Economy', 'Premium Economy', 'Business', 'US Domestic First', 'First')),
     reason    TEXT    CHECK(reason IN ('Business', 'Leisure')),
     notes     TEXT,
     UNIQUE(flight_id, name)
@@ -72,9 +73,9 @@ function migrate(db: ReturnType<typeof Database>): void {
     ).get();
 
     if (!hasAnyFlightsTable) {
-      // Completely fresh database — create v2 schema directly
-      db.exec(DDL_V2);
-      db.pragma('user_version = 2');
+      // Completely fresh database — create v3 schema directly
+      db.exec(DDL_V3);
+      db.pragma('user_version = 3');
       return;
     }
 
@@ -218,6 +219,34 @@ function migrate(db: ReturnType<typeof Database>): void {
     `);
 
     db.pragma('user_version = 2');
+    version = 2;
+  }
+
+  // Version 2 → 3: expand class CHECK constraint to include 'US Domestic First'
+  if (version === 2) {
+    db.exec(`
+      CREATE TABLE flight_passengers_v3 (
+        id        INTEGER PRIMARY KEY AUTOINCREMENT,
+        flight_id INTEGER NOT NULL REFERENCES flights(id) ON DELETE CASCADE,
+        name      TEXT    NOT NULL,
+        seat      TEXT,
+        class     TEXT    CHECK(class IN ('Economy', 'Premium Economy', 'Business', 'US Domestic First', 'First')),
+        reason    TEXT    CHECK(reason IN ('Business', 'Leisure')),
+        notes     TEXT,
+        UNIQUE(flight_id, name)
+      );
+
+      INSERT INTO flight_passengers_v3 (id, flight_id, name, seat, class, reason, notes)
+      SELECT id, flight_id, name, seat, class, reason, notes FROM flight_passengers;
+
+      DROP TABLE flight_passengers;
+      ALTER TABLE flight_passengers_v3 RENAME TO flight_passengers;
+
+      CREATE INDEX IF NOT EXISTS idx_fp_flight_id ON flight_passengers(flight_id);
+      CREATE INDEX IF NOT EXISTS idx_fp_name      ON flight_passengers(name);
+    `);
+
+    db.pragma('user_version = 3');
   }
 }
 

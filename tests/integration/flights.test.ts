@@ -119,6 +119,18 @@ describe('POST /api/flights', () => {
     expect(bob.seat).toBe('14B');
   });
 
+  it('accepts US Domestic First as a class value and round-trips it', async () => {
+    const { agent } = createTestApp();
+    const create = await agent.post('/api/flights').send({
+      ...baseFlight,
+      passengers: [{ name: 'Alice', class: 'US Domestic First' }],
+    });
+    expect(create.status).toBe(201);
+    const get = await agent.get(`/api/flights/${create.body.id}`);
+    expect(get.status).toBe(200);
+    expect(get.body.passengers[0].class).toBe('US Domestic First');
+  });
+
   it('returns 400 when required fields are missing', async () => {
     const { agent } = createTestApp();
     const res = await agent.post('/api/flights').send({ flight_date: '2026-01-01' });

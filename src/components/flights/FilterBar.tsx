@@ -1,6 +1,6 @@
 import type { FlightsFilter } from '../../types';
 
-const CLASS_OPTIONS = ['Economy', 'Premium Economy', 'Business', 'First'];
+const CLASS_OPTIONS = ['Economy', 'Premium Economy', 'Business', 'US Domestic First', 'First'];
 const REASON_OPTIONS = ['Leisure', 'Business'];
 
 interface Props {
