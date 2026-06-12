@@ -22,7 +22,7 @@ function makeFlightRecord(overrides: Partial<FlightRecord> = {}): FlightRecord {
     origin_iata: 'SFO',
     destination_iata: 'LAX',
     airline_name: 'United',
-    passengers: ['Alice'],
+    passengers: [{ name: 'Alice' }],
     created_at: '2024-03-10T00:00:00Z',
     updated_at: '2024-03-10T00:00:00Z',
     ...overrides,
