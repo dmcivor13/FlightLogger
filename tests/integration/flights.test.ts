@@ -18,6 +18,24 @@ describe('GET /api/flights', () => {
     expect(res.body.flights).toHaveLength(2);
   });
 
+  it('filters by aircraft registration (exact match)', async () => {
+    const { agent } = createTestApp();
+    await agent.post('/api/flights').send({ ...baseFlight, flight_number: 'UA1', aircraft_registration: 'G-XLEB' });
+    await agent.post('/api/flights').send({ ...baseFlight, flight_number: 'UA2', aircraft_registration: 'G-XLEB' });
+    await agent.post('/api/flights').send({ ...baseFlight, flight_number: 'UA3', aircraft_registration: 'G-YYYY' });
+    const res = await agent.get('/api/flights?registration=G-XLEB');
+    expect(res.status).toBe(200);
+    expect(res.body.flights).toHaveLength(2);
+    expect(res.body.flights.every((f: { aircraft_registration: string }) => f.aircraft_registration === 'G-XLEB')).toBe(true);
+  });
+
+  it('registration filter is case-insensitive (upper-cased on the server)', async () => {
+    const { agent } = createTestApp();
+    await agent.post('/api/flights').send({ ...baseFlight, aircraft_registration: 'G-XLEB' });
+    const res = await agent.get('/api/flights?registration=g-xleb');
+    expect(res.body.flights).toHaveLength(1);
+  });
+
   it('filters by passenger name', async () => {
     const { agent } = createTestApp();
     await agent.post('/api/flights').send({ ...baseFlight, passengers: [{ name: 'Alice' }] });

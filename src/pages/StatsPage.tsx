@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { Link } from 'react-router-dom';
 import { useStats } from '../hooks/useStats';
 import { StatCard } from '../components/stats/StatCard';
 import { BarChartCard } from '../components/stats/BarChartCard';
@@ -132,13 +133,15 @@ function HighlightsRow({ highlights }: { highlights: StatsHighlights }) {
           <div className="text-sm text-slate-500 mb-2">Repeat aircraft</div>
           <div className="flex flex-wrap gap-2">
             {repeatAircraft.map((a) => (
-              <span
+              <Link
                 key={a.registration}
-                className="inline-flex items-center gap-1 rounded-full bg-blue-50 text-blue-700 px-3 py-1 text-sm font-medium"
+                to={`/flights?registration=${encodeURIComponent(a.registration)}`}
+                className="inline-flex items-center gap-1 rounded-full bg-blue-50 text-blue-700 hover:bg-blue-100 hover:text-blue-800 px-3 py-1 text-sm font-medium transition-colors"
+                title={`Show flights on ${a.registration}`}
               >
                 <span className="font-mono">{a.registration}</span>
                 <span className="text-blue-500">×{a.count}</span>
-              </span>
+              </Link>
             ))}
           </div>
         </div>

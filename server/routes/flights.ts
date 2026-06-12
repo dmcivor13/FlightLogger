@@ -21,7 +21,7 @@ export function createFlightsRouter(db: Db) {
   // GET /api/flights
   router.get('/', (req, res) => {
     const {
-      dateFrom, dateTo, origin, destination, airline, aircraft, class: cls, reason, passenger, q,
+      dateFrom, dateTo, origin, destination, airline, aircraft, registration, class: cls, reason, passenger, q,
     } = req.query as Record<string, string>;
 
     // Always join flight_passengers so we can filter on per-passenger fields
@@ -37,6 +37,7 @@ export function createFlightsRouter(db: Db) {
     if (destination)  { conditions.push('f.destination_iata = ?');     params.push(destination.toUpperCase()); }
     if (airline)      { conditions.push('f.airline_name LIKE ?');      params.push(`%${airline}%`); }
     if (aircraft)     { conditions.push('f.aircraft_type LIKE ?');     params.push(`%${aircraft}%`); }
+    if (registration) { conditions.push('f.aircraft_registration = ?'); params.push(registration.toUpperCase()); }
     if (cls)          { conditions.push('fp.class = ?');               params.push(cls); }
     if (reason)       { conditions.push('fp.reason = ?');              params.push(reason); }
     if (q) {

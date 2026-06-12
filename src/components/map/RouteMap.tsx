@@ -13,6 +13,8 @@ interface AirportData {
   lat: number;
   lon: number;
   name: string;
+  city?: string;
+  country?: string;
 }
 
 const airportData = airports as Record<string, AirportData>;

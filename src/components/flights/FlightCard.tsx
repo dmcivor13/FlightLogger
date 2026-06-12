@@ -1,5 +1,6 @@
 import { Link } from 'react-router-dom';
 import type { FlightRecord } from '../../types';
+import { lookupAirport } from '../../utils/airports';
 
 const CLASS_COLOURS: Record<string, string> = {
   Economy: 'bg-slate-100 text-slate-700',
@@ -14,19 +15,35 @@ const REASON_COLOURS: Record<string, string> = {
 };
 
 export function FlightCard({ flight }: { flight: FlightRecord }) {
+  const origin = lookupAirport(flight.origin_iata);
+  const destination = lookupAirport(flight.destination_iata);
   return (
     <Link
       to={`/flights/${flight.id}`}
       className="block bg-white border border-slate-200 rounded-xl p-4 hover:border-blue-300 hover:shadow-sm transition-all"
     >
       <div className="flex items-start justify-between gap-4">
-        <div>
+        <div className="min-w-0">
           <div className="flex items-center gap-2 text-lg font-semibold text-slate-900">
             <span>{flight.origin_iata}</span>
             <span className="text-slate-400">→</span>
             <span>{flight.destination_iata}</span>
           </div>
-          <div className="text-sm text-slate-600 mt-0.5">
+          <div className="text-xs text-slate-500 mt-0.5 space-y-0.5">
+            {origin && (
+              <div className="truncate">
+                <span className="font-mono text-slate-400">{flight.origin_iata}</span>{' '}
+                {origin.name} · {origin.city}, {origin.country}
+              </div>
+            )}
+            {destination && (
+              <div className="truncate">
+                <span className="font-mono text-slate-400">{flight.destination_iata}</span>{' '}
+                {destination.name} · {destination.city}, {destination.country}
+              </div>
+            )}
+          </div>
+          <div className="text-sm text-slate-600 mt-1">
             {flight.airline_name}
             {flight.flight_number && ` · ${flight.flight_number}`}
             {flight.aircraft_type && ` · ${flight.aircraft_type}`}

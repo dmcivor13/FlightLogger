@@ -79,6 +79,7 @@ export interface FlightsFilter {
   destination?: string;
   airline?: string;
   aircraft?: string;
+  registration?: string;
   class?: string;
   reason?: string;
   passenger?: string;

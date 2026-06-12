@@ -15,6 +15,7 @@ export function FlightsPage() {
     destination: searchParams.get('destination') ?? undefined,
     airline:     searchParams.get('airline')     ?? undefined,
     aircraft:    searchParams.get('aircraft')    ?? undefined,
+    registration: searchParams.get('registration') ?? undefined,
     class:       searchParams.get('class')       ?? undefined,
     passenger:   searchParams.get('passenger')   ?? undefined,
   };
