@@ -221,7 +221,9 @@ function migrate(db: ReturnType<typeof Database>): void {
   }
 }
 
-export function createDb(dbPath: string = path.join(__dirname, 'flightlogger.db')) {
+const DEFAULT_DB_PATH = process.env.DB_PATH ?? path.join(__dirname, 'flightlogger.db');
+
+export function createDb(dbPath: string = DEFAULT_DB_PATH) {
   const db = new Database(dbPath);
   db.pragma('journal_mode = WAL');
   db.pragma('foreign_keys = ON');

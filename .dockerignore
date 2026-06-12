@@ -1,0 +1,15 @@
+node_modules
+dist
+dist-server
+.git
+.github
+tests
+playwright-report
+test-results
+*.db
+*.db-wal
+*.db-shm
+.env
+.env.*
+!.env.example
+.DS_Store
