@@ -64,8 +64,9 @@ export async function lookupFlight(flightNumber: string, date: string): Promise<
   return handleResponse<FlightLookupResult>(res);
 }
 
-export async function getStats(): Promise<StatsResponse> {
-  const res = await fetch('/api/stats');
+export async function getStats(passenger?: string): Promise<StatsResponse> {
+  const qs = passenger ? `?passenger=${encodeURIComponent(passenger)}` : '';
+  const res = await fetch(`/api/stats${qs}`);
   return handleResponse<StatsResponse>(res);
 }
 

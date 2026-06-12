@@ -41,6 +41,20 @@ export interface FlightRecord extends FlightPayload {
   updated_at: string;
 }
 
+export interface StatsHighlights {
+  repeatAircraft: Array<{ registration: string; count: number }>;
+  mostFlownRoute: { origin: string; destination: string; count: number } | null;
+  mostFlownAirline: { airline: string; count: number } | null;
+  totalAirMinutes: number;
+  longestFlight: {
+    origin: string;
+    destination: string;
+    durationMinutes: number;
+    date: string;
+    flightNumber: string | null;
+  } | null;
+}
+
 export interface StatsResponse {
   totals: {
     flights: number;
@@ -55,6 +69,7 @@ export interface StatsResponse {
   byReason: Array<{ reason: string; count: number }>;
   byPassenger: Array<{ passenger: string; count: number }>;
   topRoutes: Array<{ origin: string; destination: string; count: number }>;
+  highlights: StatsHighlights;
 }
 
 export interface FlightsFilter {
