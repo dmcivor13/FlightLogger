@@ -1,3 +1,4 @@
+import { useState, useRef } from 'react';
 import { useMapContext, ComposableMap, Geographies, Geography, Marker } from 'react-simple-maps';
 import airports from '../../data/airports.json';
 
@@ -59,8 +60,14 @@ export function buildArcPath(
   return `M ${fromPx[0]} ${fromPx[1]} Q ${midPx[0]} ${midPx[1]} ${toPx[0]} ${toPx[1]}`;
 }
 
-// Inner component so we can use the useMapContext hook inside ComposableMap's context.
-function RoutePaths({ routes, maxCount }: { routes: Route[]; maxCount: number }) {
+interface RoutePathsProps {
+  routes: Route[];
+  maxCount: number;
+  selectedAirport?: string | null;
+  onHover: (route: Route | null, x: number, y: number) => void;
+}
+
+function RoutePaths({ routes, maxCount, selectedAirport, onHover }: RoutePathsProps) {
   const { projection } = useMapContext();
 
   return (
@@ -73,8 +80,18 @@ function RoutePaths({ routes, maxCount }: { routes: Route[]; maxCount: number })
         const d = buildArcPath(from, to, projection as (c: [number, number]) => [number, number] | null);
         if (!d) return null;
 
-        const opacity = 0.3 + (route.count / maxCount) * 0.7;
-        const strokeWidth = 0.5 + (route.count / maxCount) * 2;
+        const isConnected =
+          !selectedAirport ||
+          route.origin === selectedAirport ||
+          route.destination === selectedAirport;
+
+        const baseOpacity = 0.3 + (route.count / maxCount) * 0.7;
+        const opacity = selectedAirport ? (isConnected ? Math.max(baseOpacity, 0.7) : 0.07) : baseOpacity;
+        const strokeWidth = selectedAirport
+          ? isConnected
+            ? 0.5 + (route.count / maxCount) * 4
+            : 0.5
+          : 0.5 + (route.count / maxCount) * 4;
 
         return (
           <path
@@ -85,6 +102,10 @@ function RoutePaths({ routes, maxCount }: { routes: Route[]; maxCount: number })
             strokeWidth={strokeWidth}
             strokeOpacity={opacity}
             vectorEffect="non-scaling-stroke"
+            style={{ cursor: 'pointer' }}
+            onMouseEnter={(e) => onHover(route, e.clientX, e.clientY)}
+            onMouseMove={(e) => onHover(route, e.clientX, e.clientY)}
+            onMouseLeave={() => onHover(null, 0, 0)}
           />
         );
       })}
@@ -92,11 +113,37 @@ function RoutePaths({ routes, maxCount }: { routes: Route[]; maxCount: number })
   );
 }
 
-export function RouteMap({ routes }: { routes: Route[] }) {
+interface RouteMapProps {
+  routes: Route[];
+  selectedAirport?: string | null;
+  onAirportClick?: (iata: string) => void;
+}
+
+export function RouteMap({ routes, selectedAirport, onAirportClick }: RouteMapProps) {
   const maxCount = Math.max(...routes.map((r) => r.count), 1);
+  const containerRef = useRef<HTMLDivElement>(null);
+
+  const [tooltip, setTooltip] = useState<{
+    route: Route;
+    x: number;
+    y: number;
+  } | null>(null);
+
+  const handleHover = (route: Route | null, clientX: number, clientY: number) => {
+    if (!route || !containerRef.current) {
+      setTooltip(null);
+      return;
+    }
+    const rect = containerRef.current.getBoundingClientRect();
+    setTooltip({ route, x: clientX - rect.left, y: clientY - rect.top });
+  };
+
+  const uniqueAirports = Array.from(
+    new Set(routes.flatMap((r) => [r.origin, r.destination])),
+  );
 
   return (
-    <div className="bg-white border border-slate-200 rounded-xl overflow-hidden">
+    <div ref={containerRef} className="bg-white border border-slate-200 rounded-xl overflow-hidden relative">
       <ComposableMap
         projection="geoNaturalEarth1"
         projectionConfig={{ scale: 160 }}
@@ -117,19 +164,46 @@ export function RouteMap({ routes }: { routes: Route[] }) {
           }
         </Geographies>
 
-        <RoutePaths routes={routes} maxCount={maxCount} />
+        <RoutePaths
+          routes={routes}
+          maxCount={maxCount}
+          selectedAirport={selectedAirport}
+          onHover={handleHover}
+        />
 
-        {/* Airport dots */}
-        {Array.from(new Set(routes.flatMap((r) => [r.origin, r.destination]))).map((iata) => {
+        {uniqueAirports.map((iata) => {
           const coords = getCoords(iata);
           if (!coords) return null;
+          const isSelected = iata === selectedAirport;
+          const isDimmed = selectedAirport && !isSelected;
           return (
-            <Marker key={iata} coordinates={coords}>
-              <circle r={2} fill="#1d4ed8" fillOpacity={0.8} />
+            <Marker
+              key={iata}
+              coordinates={coords}
+              onClick={() => onAirportClick?.(iata)}
+            >
+              {isSelected && (
+                <circle r={8} fill="none" stroke="#2563eb" strokeWidth={1.5} strokeOpacity={0.5} />
+              )}
+              <circle
+                r={isSelected ? 4 : 2}
+                fill={isSelected ? '#1d4ed8' : '#1d4ed8'}
+                fillOpacity={isDimmed ? 0.2 : 0.8}
+                style={{ cursor: onAirportClick ? 'pointer' : 'default' }}
+              />
             </Marker>
           );
         })}
       </ComposableMap>
+
+      {tooltip && (
+        <div
+          className="absolute bg-slate-900 text-white text-xs rounded px-2 py-1 pointer-events-none shadow-lg whitespace-nowrap z-10"
+          style={{ left: tooltip.x + 12, top: tooltip.y - 28 }}
+        >
+          {tooltip.route.origin} → {tooltip.route.destination} &middot; {tooltip.route.count}×
+        </div>
+      )}
     </div>
   );
 }
