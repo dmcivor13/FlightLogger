@@ -11,3 +11,6 @@ server/*.db-wal
 
 # Compiled native binaries
 *.node
+
+# Claude Code local settings
+.claude/settings.local.json
