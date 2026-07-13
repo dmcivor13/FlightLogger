@@ -30,3 +30,38 @@ jobs:
 
       - name: Unit tests
         run: npm run test:unit
+
+  docker-smoke:
+    # Build the real production image and boot it, so packaging bugs
+    # (e.g. a server file importing something the Dockerfile never copies
+    # into the runtime stage) fail CI instead of Fly at deploy time.
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Build production image
+        run: docker build -t flightlogger:smoke .
+
+      - name: Boot container
+        run: docker run -d --name flightlogger-smoke -p 3001:3001 flightlogger:smoke
+
+      - name: Wait for server and hit trip-suggestions
+        run: |
+          for i in $(seq 1 30); do
+            if curl -fsS http://localhost:3001/api/trips/suggestions > /dev/null; then
+              echo "Server booted and /api/trips/suggestions responded."
+              exit 0
+            fi
+            if [ -z "$(docker ps -q -f name=flightlogger-smoke)" ]; then
+              echo "Container exited before becoming healthy."
+              break
+            fi
+            sleep 1
+          done
+          echo "Smoke test failed — container did not become healthy."
+          docker logs flightlogger-smoke || true
+          exit 1
+
+      - name: Stop container
+        if: always()
+        run: docker rm -f flightlogger-smoke || true

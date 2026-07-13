@@ -25,6 +25,8 @@ RUN npm ci --omit=dev
 # Built client (Vite) and server sources (executed via tsx in prod)
 COPY --from=build /app/dist ./dist
 COPY --from=build /app/server ./server
+# server/services/trip-suggestions.ts imports src/data/airports.json at runtime
+COPY --from=build /app/src/data ./src/data
 
 EXPOSE 3001
 CMD ["npm", "start"]
