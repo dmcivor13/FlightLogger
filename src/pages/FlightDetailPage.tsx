@@ -1,8 +1,9 @@
 import { useState } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import { useParams, useNavigate, Link } from 'react-router-dom';
 import { useFlight } from '../hooks/useFlight';
+import { useTrips } from '../hooks/useTrips';
 import { FlightForm } from '../components/flights/FlightForm';
-import { updateFlight, deleteFlight } from '../api/client';
+import { updateFlight, deleteFlight, addFlightsToTrip, removeFlightFromTrip } from '../api/client';
 import type { FlightPayload } from '../types';
 
 const CLASS_COLOURS: Record<string, string> = {
@@ -22,8 +23,19 @@ export function FlightDetailPage() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const { flight, loading, error } = useFlight(id ? parseInt(id, 10) : null);
+  const { trips } = useTrips();
   const [editing, setEditing] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
+
+  async function handleTripChange(value: string) {
+    if (!flight) return;
+    if (value === '') {
+      if (flight.trip_id != null) await removeFlightFromTrip(flight.trip_id, flight.id);
+    } else {
+      await addFlightsToTrip(parseInt(value, 10), [flight.id]);
+    }
+    navigate(0); // reload
+  }
 
   if (loading) return <div className="text-center py-12 text-slate-400">Loading…</div>;
   if (error || !flight) return <div className="rounded-xl bg-red-50 border border-red-200 p-4 text-red-700">{error ?? 'Not found'}</div>;
@@ -98,6 +110,25 @@ export function FlightDetailPage() {
             {Math.floor(flight.duration_minutes / 60)}h {flight.duration_minutes % 60}m
           </DetailRow>
         )}
+        <DetailRow label="Trip">
+          <div className="flex items-center gap-3 flex-wrap">
+            <select
+              value={flight.trip_id ?? ''}
+              onChange={(e) => handleTripChange(e.target.value)}
+              className="rounded-md border border-slate-300 bg-white px-2 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+            >
+              <option value="">No trip</option>
+              {trips.map((t) => (
+                <option key={t.id} value={t.id}>{t.name}</option>
+              ))}
+            </select>
+            {flight.trip_id != null && (
+              <Link to={`/trips/${flight.trip_id}`} className="text-blue-600 hover:underline text-sm">
+                View trip
+              </Link>
+            )}
+          </div>
+        </DetailRow>
         {flight.passengers.length > 0 && (
           <DetailRow label="Passengers">
             <div className="space-y-2 w-full">

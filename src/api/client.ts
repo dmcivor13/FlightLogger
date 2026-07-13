@@ -6,6 +6,9 @@ import type {
   ImportPreviewResponse,
   ImportCommitResponse,
   FlightLookupResult,
+  TripPayload,
+  TripRecord,
+  TripSuggestion,
 } from '../types';
 
 async function handleResponse<T>(res: Response): Promise<T> {
@@ -56,6 +59,63 @@ export async function deleteFlight(id: number): Promise<void> {
     const body = await res.json().catch(() => ({}));
     throw new Error((body as { error?: string }).error ?? `HTTP ${res.status}`);
   }
+}
+
+export async function getTrips(): Promise<TripRecord[]> {
+  const res = await fetch('/api/trips');
+  const data = await handleResponse<{ trips: TripRecord[] }>(res);
+  return data.trips;
+}
+
+export async function getTrip(id: number): Promise<TripRecord> {
+  const res = await fetch(`/api/trips/${id}`);
+  return handleResponse<TripRecord>(res);
+}
+
+export async function createTrip(payload: TripPayload): Promise<TripRecord> {
+  const res = await fetch('/api/trips', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(payload),
+  });
+  return handleResponse<TripRecord>(res);
+}
+
+export async function updateTrip(id: number, payload: TripPayload): Promise<TripRecord> {
+  const res = await fetch(`/api/trips/${id}`, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(payload),
+  });
+  return handleResponse<TripRecord>(res);
+}
+
+export async function deleteTrip(id: number): Promise<void> {
+  const res = await fetch(`/api/trips/${id}`, { method: 'DELETE' });
+  if (!res.ok) {
+    const body = await res.json().catch(() => ({}));
+    throw new Error((body as { error?: string }).error ?? `HTTP ${res.status}`);
+  }
+}
+
+export async function addFlightsToTrip(tripId: number, flightIds: number[]): Promise<TripRecord> {
+  const res = await fetch(`/api/trips/${tripId}/flights`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ flight_ids: flightIds }),
+  });
+  return handleResponse<TripRecord>(res);
+}
+
+export async function removeFlightFromTrip(tripId: number, flightId: number): Promise<TripRecord> {
+  const res = await fetch(`/api/trips/${tripId}/flights/${flightId}`, { method: 'DELETE' });
+  return handleResponse<TripRecord>(res);
+}
+
+export async function getTripSuggestions(): Promise<TripSuggestion[]> {
+  const res = await fetch('/api/trips/suggestions');
+  const data = await handleResponse<{ suggestions: TripSuggestion[] }>(res);
+  return data.suggestions;
 }
 
 export async function lookupFlight(flightNumber: string, date: string): Promise<FlightLookupResult> {
