@@ -9,10 +9,19 @@ const __dirname = path.dirname(__filename);
 //         composite index on (flight_date, flight_number), UNIQUE on flight_passengers(flight_id, name)
 // 1 → 2: Move seat, class, reason, notes from flights to flight_passengers (per-passenger attributes)
 // 2 → 3: Expand class CHECK constraint to include 'US Domestic First'
+// 3 → 4: Add trips table + nullable flights.trip_id (ON DELETE SET NULL)
 
-const CURRENT_VERSION = 3;
+const CURRENT_VERSION = 4;
 
-const DDL_V3 = `
+const DDL_V4 = `
+  CREATE TABLE IF NOT EXISTS trips (
+    id         INTEGER PRIMARY KEY AUTOINCREMENT,
+    name       TEXT    NOT NULL,
+    notes      TEXT,
+    created_at TEXT    NOT NULL DEFAULT (datetime('now')),
+    updated_at TEXT    NOT NULL DEFAULT (datetime('now'))
+  );
+
   CREATE TABLE IF NOT EXISTS flights (
     id                    INTEGER PRIMARY KEY AUTOINCREMENT,
 
@@ -38,6 +47,8 @@ const DDL_V3 = `
     duration_minutes      INTEGER,
     data_source           TEXT,
 
+    trip_id               INTEGER REFERENCES trips(id) ON DELETE SET NULL,
+
     created_at            TEXT    NOT NULL DEFAULT (datetime('now')),
     updated_at            TEXT    NOT NULL DEFAULT (datetime('now'))
   );
@@ -57,6 +68,7 @@ const DDL_V3 = `
   CREATE INDEX IF NOT EXISTS idx_flights_flight_number    ON flights(flight_number);
   CREATE INDEX IF NOT EXISTS idx_flights_aircraft_reg     ON flights(aircraft_registration);
   CREATE INDEX IF NOT EXISTS idx_flights_date_num         ON flights(flight_date, flight_number);
+  CREATE INDEX IF NOT EXISTS idx_flights_trip_id          ON flights(trip_id);
   CREATE INDEX IF NOT EXISTS idx_fp_flight_id             ON flight_passengers(flight_id);
   CREATE INDEX IF NOT EXISTS idx_fp_name                  ON flight_passengers(name);
 `;
@@ -73,9 +85,9 @@ function migrate(db: ReturnType<typeof Database>): void {
     ).get();
 
     if (!hasAnyFlightsTable) {
-      // Completely fresh database — create v3 schema directly
-      db.exec(DDL_V3);
-      db.pragma('user_version = 3');
+      // Completely fresh database — create current schema directly
+      db.exec(DDL_V4);
+      db.pragma('user_version = 4');
       return;
     }
 
@@ -247,6 +259,26 @@ function migrate(db: ReturnType<typeof Database>): void {
     `);
 
     db.pragma('user_version = 3');
+    version = 3;
+  }
+
+  // Version 3 → 4: add trips table + nullable flights.trip_id
+  if (version === 3) {
+    db.exec(`
+      CREATE TABLE IF NOT EXISTS trips (
+        id         INTEGER PRIMARY KEY AUTOINCREMENT,
+        name       TEXT    NOT NULL,
+        notes      TEXT,
+        created_at TEXT    NOT NULL DEFAULT (datetime('now')),
+        updated_at TEXT    NOT NULL DEFAULT (datetime('now'))
+      );
+
+      ALTER TABLE flights ADD COLUMN trip_id INTEGER REFERENCES trips(id) ON DELETE SET NULL;
+
+      CREATE INDEX IF NOT EXISTS idx_flights_trip_id ON flights(trip_id);
+    `);
+
+    db.pragma('user_version = 4');
   }
 }
 

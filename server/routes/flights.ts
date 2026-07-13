@@ -2,13 +2,13 @@ import { Router } from 'express';
 import type { Db } from '../db';
 import type { FlightPayload, FlightRecord, PassengerDetail } from '../types';
 
-function getPassengers(db: Db, flightId: number): PassengerDetail[] {
+export function getPassengers(db: Db, flightId: number): PassengerDetail[] {
   return db.prepare(
     'SELECT name, seat, class, reason, notes FROM flight_passengers WHERE flight_id = ? ORDER BY id'
   ).all(flightId) as PassengerDetail[];
 }
 
-function rowToRecord(db: Db, row: Record<string, unknown>): FlightRecord {
+export function rowToRecord(db: Db, row: Record<string, unknown>): FlightRecord {
   return {
     ...(row as Omit<FlightRecord, 'passengers'>),
     passengers: getPassengers(db, row.id as number),

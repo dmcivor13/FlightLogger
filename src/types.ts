@@ -37,8 +37,32 @@ export interface FlightPayload {
 
 export interface FlightRecord extends FlightPayload {
   id: number;
+  trip_id?: number | null;
   created_at: string;
   updated_at: string;
+}
+
+export interface TripPayload {
+  name: string;
+  notes?: string;
+  flight_ids?: number[]; // on PUT: omitted = membership unchanged, present = full replace
+}
+
+export interface TripRecord {
+  id: number;
+  name: string;
+  notes: string | null;
+  created_at: string;
+  updated_at: string;
+  flights: FlightRecord[]; // chronological
+}
+
+export interface TripSuggestion {
+  name: string;
+  start_date: string;
+  end_date: string;
+  flight_ids: number[];
+  flights: FlightRecord[];
 }
 
 export interface StatsHighlights {

@@ -2,6 +2,7 @@ import express, { RequestHandler } from 'express';
 import cors from 'cors';
 import { Db } from './db';
 import { createFlightsRouter } from './routes/flights';
+import { createTripsRouter } from './routes/trips';
 import { createStatsRouter } from './routes/stats';
 import { createImportRouter } from './routes/import';
 import { createLookupRouter } from './routes/lookup';
@@ -19,6 +20,7 @@ export function createApp(db: Db, opts: CreateAppOptions = {}) {
   for (const mw of opts.beforeRoutes ?? []) app.use(mw);
 
   app.use('/api/flights', createFlightsRouter(db));
+  app.use('/api/trips', createTripsRouter(db));
   app.use('/api/stats', createStatsRouter(db));
   app.use('/api/import', createImportRouter(db));
   app.use('/api/lookup', createLookupRouter());
